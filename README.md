@@ -145,13 +145,13 @@ Once the server is running, these are the routes `app.js` communicates with:
 
 ## .gitignore
 
-`finance.db` is excluded from version control by default. Never commit your database — it contains your personal financial data.
+`finance.db` is excluded from version control by default.
 
 ---
 
 ## Screenshots
 
-*(add screenshots here after your first session)*
+
 
 ---
 
