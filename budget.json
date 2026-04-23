@@ -1,0 +1,76 @@
+{
+  "baseline": [
+    {
+      "amount": 1000,
+      "id": 1,
+      "name": "Food",
+      "note": ""
+    },
+    {
+      "amount": 1000,
+      "id": 2,
+      "name": "Fuel",
+      "note": ""
+    },
+    {
+      "amount": 385,
+      "id": 3,
+      "name": "Claude Pro",
+      "note": ""
+    },
+    {
+      "amount": 250,
+      "id": 4,
+      "name": "Hair retwist",
+      "note": ""
+    },
+    {
+      "amount": 667,
+      "id": 5,
+      "name": "Car service savings",
+      "note": "untouchable"
+    }
+  ],
+  "income": 6000,
+  "optional": [
+    {
+      "id": 1,
+      "max": 1499,
+      "min": 1399,
+      "name": "PlayStation game",
+      "tag": "GAMING",
+      "tagColor": "gaming"
+    },
+    {
+      "id": 2,
+      "max": 2000,
+      "min": 2000,
+      "name": "Clothing haul",
+      "tag": "WARDROBE",
+      "tagColor": "wardrobe"
+    },
+    {
+      "id": 3,
+      "max": 2700,
+      "min": 2000,
+      "name": "derschutze.com order",
+      "tag": "EVERY COUPLE MONTHS",
+      "tagColor": "periodic"
+    },
+    {
+      "id": 4,
+      "max": 0,
+      "min": 0,
+      "name": "None \u2014 buffer month",
+      "tag": "STACK IT",
+      "tagColor": "stack"
+    }
+  ],
+  "rules": [
+    "Clothing month \u2260 gaming month. Both together = R 751 over budget.",
+    "R 667 aside first. Car service fund is untouchable. June and December = R 4,000 ready.",
+    "Only pick one per month. That R 2,698 sits for a special edition, a derschutze drop, or stacks.",
+    "Hair can be up to R 250 if you get it styled \u2014 still within baseline."
+  ],
+  "selectedOptional": 1
+}

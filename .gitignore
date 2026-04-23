@@ -1,0 +1,25 @@
+# Database — contains personal financial data, never commit
+finance.db
+*.db
+*.db-shm
+*.db-wal
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor / tool settings
+.vscode/
+.idea/
+.claude/

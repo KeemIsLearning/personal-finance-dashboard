@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PATHFINDER — Finance Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-left">
+      <span class="logo-mark">P4THF1ND3R</span>
+      <span class="header-divider">/</span>
+      <span class="header-subtitle">FINANCE TRACKER</span>
+    </div>
+    <div class="header-right">
+      <div class="rate-pill" id="ratePill">
+        <span class="rate-label">USD/ZAR</span>
+        <span class="rate-value" id="headerRate">—</span>
+        <span class="rate-status" id="rateStatus">FETCHING</span>
+      </div>
+      <div class="month-nav">
+        <button class="nav-btn" id="prevMonth">&#8592;</button>
+        <span class="current-month" id="currentMonthLabel">—</span>
+        <button class="nav-btn" id="nextMonth">&#8594;</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+
+    <!-- OVERVIEW STRIP -->
+    <section class="overview-strip">
+      <div class="stat-card stat-income">
+        <span class="stat-label">TOTAL INCOME</span>
+        <span class="stat-value" id="totalIncome">R 0.00</span>
+        <span class="stat-sub" id="incomeSub">salary + rent</span>
+      </div>
+      <div class="stat-card stat-expenses">
+        <span class="stat-label">TOTAL EXPENSES</span>
+        <span class="stat-value" id="totalExpenses">R 0.00</span>
+        <span class="stat-sub" id="expenseSub">0 entries</span>
+      </div>
+      <div class="stat-card stat-balance" id="balanceCard">
+        <span class="stat-label">NET BALANCE</span>
+        <span class="stat-value" id="netBalance">R 0.00</span>
+        <span class="stat-sub" id="balanceSub">this month</span>
+      </div>
+      <div class="stat-card stat-rate">
+        <span class="stat-label">EXCHANGE RATE</span>
+        <span class="stat-value" id="statRate">—</span>
+        <span class="stat-sub" id="rateSub">1 USD = ? ZAR</span>
+      </div>
+    </section>
+
+    <!-- MAIN GRID -->
+    <div class="main-grid">
+
+      <!-- LEFT COLUMN: INCOME + EXPENSES -->
+      <div class="left-col">
+
+        <!-- INCOME PANEL -->
+        <section class="panel" id="incomePanel">
+          <div class="panel-header">
+            <span class="panel-title">INCOME</span>
+            <button class="panel-toggle" data-target="incomeForm">+ ADD</button>
+          </div>
+
+          <form class="entry-form hidden" id="incomeForm">
+            <div class="form-row">
+              <label>Source</label>
+              <select id="incomeSource">
+                <option value="salary">Salary (ZAR)</option>
+                <option value="rent_usd">Congo Rent (USD)</option>
+                <option value="other">Other (ZAR)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Amount</label>
+              <input type="number" id="incomeAmount" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-row" id="conversionPreview" style="display:none;">
+              <label>≈ ZAR</label>
+              <span class="conversion-preview" id="conversionValue">calculating…</span>
+            </div>
+            <div class="form-row">
+              <label>Note (optional)</label>
+              <input type="text" id="incomeNote" placeholder="e.g. March salary" />
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-cancel" data-target="incomeForm">CANCEL</button>
+              <button type="button" class="btn-submit" id="submitIncome">LOG INCOME</button>
+            </div>
+          </form>
+
+          <ul class="entry-list" id="incomeList">
+            <li class="empty-state">No income logged for this month.</li>
+          </ul>
+        </section>
+
+        <!-- EXPENSES PANEL -->
+        <section class="panel" id="expensesPanel">
+          <div class="panel-header">
+            <span class="panel-title">EXPENSES</span>
+            <button class="panel-toggle" data-target="expenseForm">+ ADD</button>
+          </div>
+
+          <form class="entry-form hidden" id="expenseForm">
+            <div class="form-row">
+              <label>Category</label>
+              <select id="expenseCategory">
+                <option value="school">School Fees</option>
+                <option value="fuel">Fuel</option>
+                <option value="subscriptions">Subscriptions</option>
+                <option value="food">Food & Groceries</option>
+                <option value="car">Car / Transport</option>
+                <option value="clothing">Clothing</option>
+                <option value="utilities">Utilities</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Amount (ZAR)</label>
+              <input type="number" id="expenseAmount" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-row">
+              <label>Description</label>
+              <input type="text" id="expenseDesc" placeholder="e.g. Claude subscription" />
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-cancel" data-target="expenseForm">CANCEL</button>
+              <button type="button" class="btn-submit" id="submitExpense">LOG EXPENSE</button>
+            </div>
+          </form>
+
+          <ul class="entry-list" id="expenseList">
+            <li class="empty-state">No expenses logged for this month.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- RIGHT COLUMN: FX PANEL + CHART -->
+      <div class="right-col">
+
+        <!-- EXCHANGE RATE PANEL -->
+        <section class="panel fx-panel">
+          <div class="panel-header">
+            <span class="panel-title">USD / ZAR EXCHANGE</span>
+            <button class="panel-toggle" id="refreshRate">↻ REFRESH</button>
+          </div>
+
+          <div class="fx-display">
+            <div class="fx-big-rate">
+              <span class="fx-number" id="fxBigNumber">—</span>
+              <span class="fx-unit">ZAR per USD</span>
+            </div>
+            <div class="fx-meta">
+              <span id="fxLastUpdate">Last updated: —</span>
+              <span id="fxSource">Source: Frankfurter API</span>
+            </div>
+          </div>
+
+          <div class="fx-converter">
+            <span class="converter-label">CONVERTER</span>
+            <div class="converter-row">
+              <div class="converter-input-wrap">
+                <span class="currency-tag">USD</span>
+                <input type="number" id="convUSD" placeholder="100" min="0" step="0.01" />
+              </div>
+              <span class="converter-arrow">→</span>
+              <div class="converter-input-wrap">
+                <span class="currency-tag">ZAR</span>
+                <input type="number" id="convZAR" placeholder="—" min="0" step="0.01" />
+              </div>
+            </div>
+          </div>
+
+          <div class="fx-sparkline-wrap">
+            <span class="sparkline-label">RATE THIS MONTH (daily)</span>
+            <div style="position:relative; height: 80px;">
+              <canvas id="sparklineChart" role="img" aria-label="USD/ZAR daily rate sparkline this month">Exchange rate sparkline</canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- HISTORY CHART -->
+        <section class="panel chart-panel">
+          <div class="panel-header">
+            <span class="panel-title">MONTHLY HISTORY</span>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-dot income-dot"></span>Income</span>
+            <span class="legend-item"><span class="legend-dot expense-dot"></span>Expenses</span>
+            <span class="legend-item"><span class="legend-dot balance-dot"></span>Balance</span>
+          </div>
+          <div style="position: relative; height: 220px;">
+            <canvas id="historyChart" role="img" aria-label="Monthly income, expenses and balance bar chart">Monthly financial history</canvas>
+          </div>
+          <div id="noHistoryMsg" class="empty-state" style="display:none;">Log data across multiple months to see history.</div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- BUDGET PLANNER -->
+    <section class="budget-section panel">
+
+      <div class="panel-header budget-panel-header">
+        <div class="budget-header-left">
+          <span class="panel-title">KMK_BUDGET</span>
+          <span class="budget-header-sub">MONTHLY · ZAR</span>
+        </div>
+        <button class="panel-toggle" id="budgetEditIncomeBtn">EDIT INCOME</button>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="budget-overview-strip">
+        <div class="stat-card budget-income-card">
+          <span class="stat-label">INCOME</span>
+          <span class="stat-value" id="budgetIncome">R 0</span>
+        </div>
+        <div class="stat-card budget-baseline-card">
+          <span class="stat-label">BASELINE OUT</span>
+          <span class="stat-value" id="budgetBaselineOut">R 0</span>
+        </div>
+        <div class="stat-card budget-remaining-card">
+          <span class="stat-label">REMAINING</span>
+          <span class="stat-value" id="budgetRemaining">R 0</span>
+        </div>
+      </div>
+
+      <!-- Two-column body -->
+      <div class="budget-body">
+
+        <!-- Left column: baseline + optional -->
+        <div class="budget-col-left">
+
+          <div class="budget-section-label">BASELINE — EVERY MONTH</div>
+          <ul class="budget-list" id="budgetBaselineList"></ul>
+          <div class="budget-add-row">
+            <button class="panel-toggle" id="budgetAddBaselineBtn">+ ADD ITEM</button>
+          </div>
+
+          <div class="budget-section-label">OPTIONAL — PICK ONE <span class="budget-section-sub">(TAP TO SELECT)</span></div>
+          <ul class="budget-list" id="budgetOptionalList"></ul>
+          <div class="budget-add-row">
+            <button class="panel-toggle" id="budgetAddOptionalBtn">+ ADD OPTION</button>
+          </div>
+
+        </div>
+
+        <!-- Right column: totals + bar + rules -->
+        <div class="budget-right-col">
+
+          <div class="budget-section-label" style="border-top:none;padding-top:0.9rem">THIS MONTH'S TOTAL</div>
+          <div id="budgetTotals"></div>
+
+          <div class="budget-bar-wrap">
+            <div class="budget-bar-header">
+              <span style="font-size:0.65rem;color:var(--text-muted);font-family:var(--font-body)">spending vs income</span>
+              <span class="budget-bar-pct" id="budgetBarPct">0%</span>
+            </div>
+            <div class="budget-bar-track">
+              <div class="budget-bar-fill" id="budgetBarFill" style="width:0%"></div>
+            </div>
+            <div class="budget-bar-labels">
+              <span>R 0</span>
+              <span id="budgetBarMax">R 0</span>
+            </div>
+          </div>
+
+          <div class="budget-section-label" style="padding-left:0;border-top:none">RULES</div>
+          <ul class="budget-rules" id="budgetRules"></ul>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+      <span>P4THF1ND3R FINANCE v1.0</span>
+      <span id="footerDate">—</span>
+      <a href="https://exchangerate-api.com" target="_blank" class="footer-attr">Exchange data: Frankfurter API</a>
+    </footer>
+
+  </main>
+
+  <!-- EDIT MODAL -->
+  <div id="editModal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="editModalTitle">Edit Entry</span>
+        <button class="modal-close" id="editModalClose">&times;</button>
+      </div>
+      <div class="modal-body" id="editModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="editCancelBtn">CANCEL</button>
+        <button class="btn-submit" id="editSaveBtn">SAVE CHANGES</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
