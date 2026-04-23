@@ -139,11 +139,17 @@ def get_history():
 
 #Budget config routes
 BUDGET_PATH = os.path.join(BASE_DIR, 'budget.json')
+BUDGET_EXAMPLE_PATH = os.path.join(BASE_DIR, 'budget.example.json')
+
+def _ensure_budget_file():
+    """Create budget.json from the example template if it doesn't exist yet."""
+    if not os.path.exists(BUDGET_PATH):
+        import shutil
+        shutil.copy(BUDGET_EXAMPLE_PATH, BUDGET_PATH)
 
 @app.route('/api/budget', methods=['GET'])
 def get_budget():
-    if not os.path.exists(BUDGET_PATH):
-        return jsonify({'income': 0, 'baseline': [], 'optional': [], 'rules': [], 'selectedOptional': None})
+    _ensure_budget_file()
     with open(BUDGET_PATH, 'r') as f:
         return jsonify(json.load(f))
 

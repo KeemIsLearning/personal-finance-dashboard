@@ -4,6 +4,9 @@ finance.db
 *.db-shm
 *.db-wal
 
+# Budget config — contains personal values, never commit (see budget.example.json)
+budget.json
+
 # Python cache
 __pycache__/
 *.pyc
