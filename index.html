@@ -20,7 +20,7 @@
     </div>
     <div class="header-right">
       <div class="rate-pill" id="ratePill">
-        <span class="rate-label">USD/ZAR</span>
+        <span class="rate-label" id="ratePillLabel">USD/ZAR</span>
         <span class="rate-value" id="headerRate">—</span>
         <span class="rate-status" id="rateStatus">FETCHING</span>
       </div>
@@ -153,14 +153,19 @@
         <!-- EXCHANGE RATE PANEL -->
         <section class="panel fx-panel">
           <div class="panel-header">
-            <span class="panel-title">USD / ZAR EXCHANGE</span>
+            <span class="panel-title" id="fxPanelTitle">USD / ZAR EXCHANGE</span>
+            <div class="fx-currency-toggle">
+              <button class="fx-toggle-btn active" data-currency="USD">USD</button>
+              <button class="fx-toggle-btn" data-currency="EUR">EUR</button>
+              <button class="fx-toggle-btn" data-currency="GBP">GBP</button>
+            </div>
             <button class="panel-toggle" id="refreshRate">↻ REFRESH</button>
           </div>
 
           <div class="fx-display">
             <div class="fx-big-rate">
               <span class="fx-number" id="fxBigNumber">—</span>
-              <span class="fx-unit">ZAR per USD</span>
+              <span class="fx-unit" id="fxUnit">ZAR per USD</span>
             </div>
             <div class="fx-meta">
               <span id="fxLastUpdate">Last updated: —</span>
@@ -172,7 +177,7 @@
             <span class="converter-label">CONVERTER</span>
             <div class="converter-row">
               <div class="converter-input-wrap">
-                <span class="currency-tag">USD</span>
+                <span class="currency-tag" id="convCurrencyTag">USD</span>
                 <input type="number" id="convUSD" placeholder="100" min="0" step="0.01" />
               </div>
               <span class="converter-arrow">→</span>
@@ -184,7 +189,7 @@
           </div>
 
           <div class="fx-sparkline-wrap">
-            <span class="sparkline-label">RATE THIS MONTH (daily)</span>
+            <span class="sparkline-label" id="sparklineLabel">USD/ZAR RATE THIS MONTH</span>
             <div style="position:relative; height: 80px;">
               <canvas id="sparklineChart" role="img" aria-label="USD/ZAR daily rate sparkline this month">Exchange rate sparkline</canvas>
             </div>
@@ -288,7 +293,7 @@
     <footer class="site-footer">
       <span>P4THF1ND3R FINANCE v1.0</span>
       <span id="footerDate">—</span>
-      <a href="https://exchangerate-api.com" target="_blank" class="footer-attr">Exchange data: Frankfurter API</a>
+      <a href="https://www.frankfurter.dev" target="_blank" class="footer-attr">Exchange data: Frankfurter</a>
     </footer>
 
   </main>
