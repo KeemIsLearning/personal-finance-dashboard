@@ -151,3 +151,60 @@ def test_extract_positional_rows_groups_by_y():
     assert len(rows) == 2
     assert rows[0] == ['Date', 'Description']
     assert rows[1] == ['2025-05-01', 'Woolworths']
+
+from pdf_parser import _parse_amount_cell, _rows_to_transactions, parse_bank_statement
+
+def test_parse_amount_split_columns_debit():
+    row = ['2025-05-01', 'Woolworths', '420.00', '', '10000.00']
+    cols = {'date': 0, 'description': 1, 'debit': 2, 'credit': 3, 'amount': None, 'balance': 4}
+    amount, is_debit = _parse_amount_cell(row, cols, 'split_columns')
+    assert amount == 420.0
+    assert is_debit is True
+
+def test_parse_amount_split_columns_credit():
+    row = ['2025-05-02', 'Salary', '', '28000.00', '38000.00']
+    cols = {'date': 0, 'description': 1, 'debit': 2, 'credit': 3, 'amount': None, 'balance': 4}
+    amount, is_debit = _parse_amount_cell(row, cols, 'split_columns')
+    assert amount == 28000.0
+    assert is_debit is False
+
+def test_parse_amount_signed_negative():
+    row = ['2025-05-01', 'Woolworths', '-420.00', '10000.00']
+    cols = {'date': 0, 'description': 1, 'debit': None, 'credit': None, 'amount': 2, 'balance': 3}
+    amount, is_debit = _parse_amount_cell(row, cols, 'signed_amount')
+    assert amount == 420.0
+    assert is_debit is True
+
+def test_parse_amount_dr_cr_suffix_dr():
+    row = ['2025-05-01', 'Woolworths', '420.00 DR', '10000.00']
+    cols = {'date': 0, 'description': 1, 'debit': None, 'credit': None, 'amount': 2, 'balance': 3}
+    amount, is_debit = _parse_amount_cell(row, cols, 'dr_cr_suffix')
+    assert amount == 420.0
+    assert is_debit is True
+
+def test_rows_to_transactions_basic():
+    rows = [
+        ['Date', 'Description', 'Debit', 'Credit', 'Balance'],
+        ['2025-05-01', 'Woolworths JHB', '420.00', '', '10000.00'],
+    ]
+    txns = _rows_to_transactions(rows)
+    assert len(txns) == 1
+    t = txns[0]
+    assert t['date'] == '2025-05-01'
+    assert t['amount'] == 420.0
+    assert t['is_debit'] is True
+    assert t['suggested_type'] == 'variable_expense'
+
+def test_parse_bank_statement_image_pdf():
+    """parse_bank_statement on a zero-text PDF returns a graceful error."""
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [_make_mock_page(table=None, words=[])]
+    mock_pdf.__enter__ = lambda s: s
+    mock_pdf.__exit__ = MagicMock(return_value=False)
+
+    with patch('pdf_parser.pdfplumber.open', return_value=mock_pdf):
+        stream = io.BytesIO(b'fake')
+        result = parse_bank_statement(stream)
+
+    assert result['success'] is False
+    assert result['error_type'] == 'image_pdf'
