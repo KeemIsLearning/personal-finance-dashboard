@@ -186,15 +186,16 @@ async function fetchSparklineData() {
     const from = `${year}-${month}-01`;
     const to = today();
     try {
-        const res = await fetch(
-            `/api/fx/history?from=${from}&to=${to}`
-        );
+        const res = await fetch(`/api/fx/history?from=${from}&to=${to}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.rates) {
-            state.sparklineData = Object.entries(data.rates)
-                .map(([date, rates]) => ({ date, value: rates.ZAR }))
-                .sort((a, b) => a.date.localeCompare(b.date));
+            const entries = Object.entries(data.rates).sort(([a], [b]) => a.localeCompare(b));
+            state.sparklineDataAll = {
+                USD: entries.map(([date, r]) => ({ date, value: r.USD })),
+                EUR: entries.map(([date, r]) => ({ date, value: r.EUR })),
+                GBP: entries.map(([date, r]) => ({ date, value: r.GBP })),
+            };
         }
         renderSparkline();
     } catch (err) {
@@ -437,59 +438,60 @@ document.getElementById('submitExpense').addEventListener('click', async () => {
 
 //Charts,navigation,helpers and init
 function renderSparkline() {
-  const canvas = document.getElementById('sparklineChart');
-  if (state.sparklineChart) { state.sparklineChart.destroy(); }
-  if (!state.sparklineData.length) return;
+    const canvas = document.getElementById('sparklineChart');
+    if (state.sparklineChart) { state.sparklineChart.destroy(); }
+    const data = state.sparklineDataAll[state.activeCurrency] || [];
+    if (!data.length) return;
 
-  const labels = state.sparklineData.map(d => d.date.slice(5));
-  const values = state.sparklineData.map(d => parseFloat(d.value.toFixed(4)));
+    const labels = data.map(d => d.date.slice(5));
+    const values = data.map(d => parseFloat(d.value.toFixed(4)));
 
-  state.sparklineChart = new Chart(canvas, {
-      type: 'line',
-      data: {
-          labels,
-          datasets: [{
-              data: values,
-              borderColor: '#e8a020',
-              borderWidth: 1.5,
-              pointRadius: 0,
-              pointHoverRadius: 3,
-              fill: true,
-              backgroundColor: 'rgba(232,160,32,0.06)',
-              tension: 0.3
-          }]
-      },
-      options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-              legend: { display: false },
-              tooltip: {
-                  backgroundColor: '#222220',
-                  borderColor: 'rgba(232,160,32,0.3)',
-                  borderWidth: 1,
-                  titleColor: '#9a9488',
-                  bodyColor: '#e8a020',
-                  bodyFont: { family: 'Share Tech Mono', size: 12 },
-                  callbacks: { label: ctx => `R ${ctx.raw.toFixed(4)}` }
-              }
-          },
-          scales: {
-              x: {
-                  ticks: { color: '#5a564e', font: { family: 'Share Tech Mono', size: 10 },
-                      maxTicksLimit: 6, autoSkip: true, maxRotation: 0 },
-                  grid: { color: 'rgba(255,255,255,0.04)' },
-                  border: { color: 'rgba(255,255,255,0.07)' }
-              },
-              y: {
-                  ticks: { color: '#5a564e', font: { family: 'Share Tech Mono', size: 10 },
-                      callback: v => v.toFixed(2) },
-                  grid: { color: 'rgba(255,255,255,0.04)' },
-                  border: { color: 'rgba(255,255,255,0.07)' }
-              }
-          }
-      }
-  });
+    state.sparklineChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                borderColor: '#e8a020',
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                fill: true,
+                backgroundColor: 'rgba(232,160,32,0.06)',
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#222220',
+                    borderColor: 'rgba(232,160,32,0.3)',
+                    borderWidth: 1,
+                    titleColor: '#9a9488',
+                    bodyColor: '#e8a020',
+                    bodyFont: { family: 'Share Tech Mono', size: 12 },
+                    callbacks: { label: ctx => `R ${ctx.raw.toFixed(4)}` }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#5a564e', font: { family: 'Share Tech Mono', size: 10 },
+                        maxTicksLimit: 6, autoSkip: true, maxRotation: 0 },
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                    border: { color: 'rgba(255,255,255,0.07)' }
+                },
+                y: {
+                    ticks: { color: '#5a564e', font: { family: 'Share Tech Mono', size: 10 },
+                        callback: v => v.toFixed(2) },
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                    border: { color: 'rgba(255,255,255,0.07)' }
+                }
+            }
+        }
+    });
 }
 
 async function renderHistoryChart() {
