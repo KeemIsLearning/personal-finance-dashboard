@@ -356,8 +356,8 @@ function updateConversionPreview() {
   const source = document.getElementById('incomeSource').value;
   const amount = parseFloat(document.getElementById('incomeAmount').value);
   const el = document.getElementById('conversionValue');
-  if (source === 'rent_usd' && !isNaN(amount) && state.rate) {
-      el.textContent = `R ${(amount * state.rate).toFixed(2)}`;
+  if (source === 'rent_usd' && !isNaN(amount) && state.rates.USD) {
+      el.textContent = `R ${(amount * state.rates.USD).toFixed(2)}`;
   } else {
       el.textContent = 'calculating…';
   }
@@ -375,10 +375,10 @@ document.getElementById('submitIncome').addEventListener('click', async () => {
   let rate_used = null;
 
   if (source === 'rent_usd') {
-      if (!state.rate) { alert('Exchange rate not loaded yet. Please wait or refresh.'); return; }
-      amount_zar = rawAmount * state.rate;
+      if (!state.rates.USD) { alert('Exchange rate not loaded yet. Please wait or refresh.'); return; }
+      amount_zar = rawAmount * state.rates.USD;
       currency = 'USD';
-      rate_used = state.rate;
+      rate_used = state.rates.USD;
   }
 
   try {
@@ -589,26 +589,29 @@ async function renderHistoryChart() {
 }
 
 function initConverter() {
-    const usdInput = document.getElementById('convUSD');
+    const fxInput = document.getElementById('convUSD');
     const zarInput = document.getElementById('convZAR');
-    usdInput.addEventListener('input', () => {
-        if (!state.rate) return;
-        const usd = parseFloat(usdInput.value);
-        zarInput.value = isNaN(usd) ? '' : (usd * state.rate).toFixed(2);
+    fxInput.addEventListener('input', () => {
+        const rate = state.rates[state.activeCurrency];
+        if (!rate) return;
+        const val = parseFloat(fxInput.value);
+        zarInput.value = isNaN(val) ? '' : (val * rate).toFixed(2);
     });
     zarInput.addEventListener('input', () => {
-        if (!state.rate) return;
-        const zar = parseFloat(zarInput.value);
-        usdInput.value = isNaN(zar) ? '' : (zar / state.rate).toFixed(2);
+        const rate = state.rates[state.activeCurrency];
+        if (!rate) return;
+        const val = parseFloat(zarInput.value);
+        fxInput.value = isNaN(val) ? '' : (val / rate).toFixed(2);
     });
 }
 
 function renderConverter() {
-    const usdInput = document.getElementById('convUSD');
+    const fxInput = document.getElementById('convUSD');
     const zarInput = document.getElementById('convZAR');
-    if (!state.rate || !usdInput.value) return;
-    const usd = parseFloat(usdInput.value);
-    if (!isNaN(usd)) zarInput.value = (usd * state.rate).toFixed(2);
+    const rate = state.rates[state.activeCurrency];
+    if (!rate || !fxInput.value) return;
+    const val = parseFloat(fxInput.value);
+    if (!isNaN(val)) zarInput.value = (val * rate).toFixed(2);
 }
 
 document.getElementById('prevMonth').addEventListener('click', () => {
@@ -779,10 +782,10 @@ async function saveEdit() {
         if (isNaN(amount_original) || amount_original <= 0) { alert('Enter a valid amount.'); return; }
         let currency = 'ZAR', amount_zar = amount_original, rate_used = null;
         if (source === 'rent_usd') {
-            if (!state.rate) { alert('Exchange rate not loaded yet.'); return; }
+            if (!state.rates.USD) { alert('Exchange rate not loaded yet.'); return; }
             currency = 'USD';
-            amount_zar = parseFloat((amount_original * state.rate).toFixed(2));
-            rate_used = state.rate;
+            amount_zar = parseFloat((amount_original * state.rates.USD).toFixed(2));
+            rate_used = state.rates.USD;
         }
         body = { source, amount_original, currency, amount_zar, rate_used, date_received, notes };
     } else if (type === 'fixed') {
