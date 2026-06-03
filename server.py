@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import database
+import pdf_parser
 import os
 import json
 import requests as _requests
@@ -171,6 +172,82 @@ def fx_history():
     to = request.args.get('to')
     r = _requests.get(f'https://api.frankfurter.app/{from_}..{to}?from=USD&to=ZAR', timeout=5)
     return (r.content, r.status_code, {'Content-Type': 'application/json'})
+
+# ── PDF Import routes ──────────────────────────────────────────────────────
+
+@app.route('/api/pdf/preview', methods=['POST'])
+def preview_pdf_import():
+    if 'statement' not in request.files:
+        return jsonify({'error': 'No file uploaded.'}), 400
+
+    f = request.files['statement']
+
+    if not f.filename.lower().endswith('.pdf') or f.mimetype not in ('application/pdf', 'application/octet-stream'):
+        return jsonify({'error': 'Please upload a PDF file.'}), 400
+
+    f.stream.seek(0, 2)
+    size = f.stream.tell()
+    f.stream.seek(0)
+    if size > 10 * 1024 * 1024:
+        return jsonify({'error': 'This file is too large. Please upload a PDF under 10MB.'}), 413
+
+    result = pdf_parser.parse_bank_statement(f.stream)
+    return jsonify(result)
+
+
+@app.route('/api/pdf/confirm', methods=['POST'])
+def confirm_pdf_import():
+    data = request.get_json()
+    transactions = data.get('transactions', [])
+
+    inserted = 0
+    skipped = 0
+    errors = []
+
+    for txn in transactions:
+        confirmed_type = txn.get('confirmed_type', '')
+        if confirmed_type == 'skip':
+            skipped += 1
+            continue
+
+        try:
+            if confirmed_type == 'income':
+                database.add_income(
+                    source=txn.get('confirmed_category', 'Other Income'),
+                    amount_original=txn['amount'],
+                    currency='ZAR',
+                    amount_zar=txn['amount'],
+                    rate_used=None,
+                    date_received=txn['date'],
+                    notes=txn.get('description', ''),
+                )
+            elif confirmed_type == 'fixed_expense':
+                database.add_fixed_expense(
+                    category=txn.get('confirmed_category', 'Other'),
+                    person='Kai',
+                    amount_zar=txn['amount'],
+                    description=txn.get('description', ''),
+                    is_recurring=0,
+                    due_day=None,
+                    date_logged=txn['date'],
+                )
+            elif confirmed_type == 'variable_expense':
+                database.add_variable_expense(
+                    category=txn.get('confirmed_category', 'Other'),
+                    amount_zar=txn['amount'],
+                    description=txn.get('description', ''),
+                    date_logged=txn['date'],
+                )
+            else:
+                errors.append({'row': txn, 'reason': f'Unknown type: {confirmed_type}'})
+                continue
+
+            inserted += 1
+
+        except Exception as exc:
+            errors.append({'row': txn, 'reason': str(exc)})
+
+    return jsonify({'inserted': inserted, 'skipped': skipped, 'errors': errors})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
