@@ -199,8 +199,15 @@ def fx_latest():
 @app.route('/api/fx/history')
 def fx_history():
     import json as _json
-    from_ = request.args.get('from')
-    to = request.args.get('to')
+    from datetime import date as _date
+    from_ = request.args.get('from', '')
+    to = request.args.get('to', '')
+
+    try:
+        _date.fromisoformat(from_)
+        _date.fromisoformat(to)
+    except ValueError:
+        return (_json.dumps({'error': 'Invalid date parameters. Use YYYY-MM-DD.'}), 400, {'Content-Type': 'application/json'})
 
     try:
         r = _requests.get(
