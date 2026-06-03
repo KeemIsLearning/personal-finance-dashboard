@@ -24,6 +24,9 @@
         <span class="rate-value" id="headerRate">—</span>
         <span class="rate-status" id="rateStatus">FETCHING</span>
       </div>
+      <!-- PDF Import -->
+      <input type="file" id="pdf-upload-input" accept=".pdf" style="display:none">
+      <button id="pdf-import-btn" class="btn-industrial">&#8659; Import Statement</button>
       <div class="month-nav">
         <button class="nav-btn" id="prevMonth">&#8592;</button>
         <span class="current-month" id="currentMonthLabel">—</span>
@@ -303,6 +306,52 @@
         <button class="btn-submit" id="editSaveBtn">SAVE CHANGES</button>
       </div>
     </div>
+  </div>
+
+  <!-- PDF IMPORT PREVIEW MODAL -->
+  <div id="pdf-modal-overlay" class="pdf-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title">
+    <div class="pdf-modal">
+
+      <div class="pdf-modal-header">
+        <span class="pdf-modal-title" id="pdf-modal-title">IMPORT PREVIEW</span>
+        <button class="pdf-modal-close" id="pdf-modal-close" aria-label="Cancel import">&#10005; Cancel</button>
+      </div>
+
+      <div class="pdf-modal-summary" id="pdf-modal-summary">
+        <!-- Populated by JS -->
+      </div>
+
+      <div class="pdf-modal-table-wrap">
+        <table class="pdf-preview-table" id="pdf-preview-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="pdf-select-all" title="Select all"></th>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Conf.</th>
+            </tr>
+          </thead>
+          <tbody id="pdf-preview-tbody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pdf-modal-footer">
+        <div class="pdf-modal-error hidden" id="pdf-modal-error"></div>
+        <button class="btn-industrial btn-confirm" id="pdf-confirm-btn" disabled>Confirm Import</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="pdf-loading-overlay" class="pdf-loading-overlay hidden">
+    <div class="pdf-spinner"></div>
+    <span class="pdf-loading-label">PARSING STATEMENT…</span>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
