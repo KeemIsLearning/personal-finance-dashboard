@@ -5,7 +5,7 @@ import pdf_parser
 import os
 import json
 import requests as _requests
-from datetime import date
+from datetime import date, datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -163,7 +163,6 @@ def update_budget():
 #FX proxy routes
 @app.route('/api/fx/latest')
 def fx_latest():
-    import json as _json
     def _fetch_all():
         r = _requests.get(
             'https://api.frankfurter.dev/v1/latest?from=ZAR&to=USD,EUR,GBP', timeout=5
@@ -178,7 +177,7 @@ def fx_latest():
 
     try:
         result = _fetch_all()
-        return (_json.dumps(result), 200, {'Content-Type': 'application/json'})
+        return (json.dumps(result), 200, {'Content-Type': 'application/json'})
     except Exception:
         pass
 
@@ -187,27 +186,29 @@ def fx_latest():
         r = _requests.get('https://open.er-api.com/v6/latest/ZAR', timeout=5)
         d = r.json()
         rates_raw = d.get('rates', {})
+        ts = d.get('time_last_update_unix', 0)
+        date_str = datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d') if ts else ''
         result = {
-            'date': d.get('time_last_update_utc', '')[:10],
+            'date': date_str,
             'rates': {k: round(1 / rates_raw[k], 6) for k in ('USD', 'EUR', 'GBP') if rates_raw.get(k)}
         }
-        return (_json.dumps(result), 200, {'Content-Type': 'application/json'})
+        return (json.dumps(result), 200, {'Content-Type': 'application/json'})
     except Exception as exc:
-        import json as _json
-        return (_json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
+        return (json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
 
 @app.route('/api/fx/history')
 def fx_history():
-    import json as _json
-    from datetime import date as _date
     from_ = request.args.get('from', '')
     to = request.args.get('to', '')
 
     try:
-        _date.fromisoformat(from_)
-        _date.fromisoformat(to)
+        date.fromisoformat(from_)
+        date.fromisoformat(to)
     except ValueError:
-        return (_json.dumps({'error': 'Invalid date parameters. Use YYYY-MM-DD.'}), 400, {'Content-Type': 'application/json'})
+        return (json.dumps({'error': 'Invalid date parameters. Use YYYY-MM-DD.'}), 400, {'Content-Type': 'application/json'})
+
+    if date.fromisoformat(from_) > date.fromisoformat(to):
+        return (json.dumps({'error': 'from must not be after to'}), 400, {'Content-Type': 'application/json'})
 
     try:
         r = _requests.get(
@@ -217,10 +218,10 @@ def fx_history():
             raise Exception(f'HTTP {r.status_code}')
         d = r.json()
         inverted = {
-            date: {k: round(1 / v, 6) for k, v in day_rates.items()}
-            for date, day_rates in d.get('rates', {}).items()
+            date_key: {k: round(1 / v, 6) for k, v in day_rates.items()}
+            for date_key, day_rates in d.get('rates', {}).items()
         }
-        return (_json.dumps({'rates': inverted}), 200, {'Content-Type': 'application/json'})
+        return (json.dumps({'rates': inverted}), 200, {'Content-Type': 'application/json'})
     except Exception:
         pass
 
@@ -229,11 +230,12 @@ def fx_history():
         r = _requests.get('https://open.er-api.com/v6/latest/ZAR', timeout=5)
         d = r.json()
         rates_raw = d.get('rates', {})
-        today_str = d.get('time_last_update_utc', '')[:10]
+        ts = d.get('time_last_update_unix', 0)
+        today_str = datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d') if ts else ''
         day = {k: round(1 / rates_raw[k], 6) for k in ('USD', 'EUR', 'GBP') if rates_raw.get(k)}
-        return (_json.dumps({'rates': {today_str: day}}), 200, {'Content-Type': 'application/json'})
+        return (json.dumps({'rates': {today_str: day}}), 200, {'Content-Type': 'application/json'})
     except Exception as exc:
-        return (_json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
+        return (json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
 
 # ── PDF Import routes ──────────────────────────────────────────────────────
 
