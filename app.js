@@ -12,9 +12,10 @@ const API = 'http://127.0.0.1:5000/api';
 const state = {
     currentYear: new Date().getFullYear(),
     currentMonth: new Date().getMonth(),
-    rate: null,
+    rates: { USD: null, EUR: null, GBP: null },
+    activeCurrency: 'USD',
     rateUpdated: null,
-    sparklineData: [],
+    sparklineDataAll: { USD: [], EUR: [], GBP: [] },
     historyChart: null,
     sparklineChart: null,
     budget: null
@@ -79,9 +80,11 @@ async function fetchRate(forceRefresh = false) {
         const cached = localStorage.getItem(FX_CACHE_KEY);
         if (cached) {
             try {
-                const { rate, updated, timestamp } = JSON.parse(cached);
+                const { rates, updated, timestamp } = JSON.parse(cached);
                 if (Date.now() - timestamp < FX_CACHE_TTL) {
-                    applyRate(rate, updated);
+                    state.rates = rates;
+                    state.rateUpdated = updated;
+                    applyRate();
                     return;
                 }
             } catch { }
@@ -92,16 +95,19 @@ async function fetchRate(forceRefresh = false) {
         const res = await fetch('/api/fx/latest');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        const rate = data.rates.ZAR;
+        const rates = data.rates;          // { USD: 16.27, EUR: 17.86, GBP: 21.04 }
         const updated = data.date || today();
 
+        state.rates = rates;
+        state.rateUpdated = updated;
+
         localStorage.setItem(FX_CACHE_KEY, JSON.stringify({
-            rate, updated, timestamp: Date.now()
+            rates, updated, timestamp: Date.now()
         }));
 
-        await apiPost('/rate', { rate_date: updated, usd_to_zar: rate });
+        await apiPost('/rate', { rate_date: updated, usd_to_zar: rates.USD });
 
-        applyRate(rate, updated);
+        applyRate();
         await fetchSparklineData();
     } catch (err) {
         console.error('FX fetch error:', err);
@@ -110,8 +116,10 @@ async function fetchRate(forceRefresh = false) {
         const cached = localStorage.getItem(FX_CACHE_KEY);
         if (cached) {
             try {
-                const { rate, updated } = JSON.parse(cached);
-                applyRate(rate, updated);
+                const { rates, updated } = JSON.parse(cached);
+                state.rates = rates;
+                state.rateUpdated = updated;
+                applyRate();
                 setRateStatus('CACHED');
             } catch { }
         }
