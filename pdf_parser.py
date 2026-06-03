@@ -5,23 +5,30 @@ _NOISE_PREFIXES = re.compile(
     r'PAYMENT TO|PAYMENT FROM|STO |EFT CREDIT|EFT DEBIT)\s*',
     re.IGNORECASE
 )
-_CARD_NUMBER = re.compile(r'\*{4}\d{4}')
+_CARD_NUMBER = re.compile(r'\*{4}\d{4}|\d{6}\*\d{4}')
 _LONG_REF = re.compile(r'\b\d{6,}\b')
+_TRAILING_DATE = re.compile(r'\s+\d{1,2}\s+[A-Za-z]{3}\s*$')
 _MULTI_SPACE = re.compile(r' {2,}')
 
 
 def clean_transaction_description(raw: str) -> str:
     s = raw.strip()
+    # Strip leading # (FNB bank fee rows)
+    s = s.lstrip('#').strip()
     s = _NOISE_PREFIXES.sub('', s)
     s = _CARD_NUMBER.sub('', s)
     s = _LONG_REF.sub('', s)
+    s = _TRAILING_DATE.sub('', s)
     s = _MULTI_SPACE.sub(' ', s).strip()
     return s.title()
 
 
 _INCOME_KEYWORDS = {
-    'Salary':        ['salary', 'payroll', 'remuneration'],
-    'Transfer In':   ['transfer', 'trf', 'payment received'],
+    'Salary':        ['salary', 'payroll', 'remuneration', 'investec', 'magtape credit'],
+    'Transfer In':   ['transfer', 'trf', 'payment received', 'payment from', 'pmt from',
+                      'ob pmt', 'payshap credit', 'rtc credit', 'int-banking pmt frm',
+                      'fnb app payment from', 'cash deposit', 'adt cash deposit',
+                      'payshap account on-us', 'fnb app transfer from'],
     'Rental Income': ['rent', 'rental'],
 }
 
@@ -31,13 +38,19 @@ _FIXED_KEYWORDS = [
 ]
 
 _VARIABLE_KEYWORDS = {
-    'Food & Drink': ['woolworths', 'pick n pay', 'checkers', 'spar', 'restaurant',
-                     'kfc', 'mcdonalds', 'mcdonald', 'uber eats', 'mr d', 'nando'],
+    'Food & Drink': ['woolworths', 'pick n pay', 'pnp', 'checkers', 'spar', 'restaurant',
+                     'kfc', 'mcdonalds', 'mcdonald', 'mcd ', 'uber eats', 'mr d', 'nando',
+                     'steers', 'debonairs', 'kauai', 'federal', 'spicy world', 'kingsley',
+                     'all spicy', 'hpy*', 'yoco', 'ons winkel', 'ccn*'],
     'Fuel':         ['fuel', 'engen', 'shell', 'bp', 'total', 'caltex', 'sasol'],
-    'Transport':    ['uber', 'bolt', 'taxi', 'gautrain', 'metrobus'],
-    'Shopping':     ['zara', 'h&m', 'mr price', 'edgars', 'superbalist', 'takealot'],
-    'Gaming':       ['steam', 'playstation', 'xbox', 'psn', 'nintendo'],
-    'Clothing':     ['clothing', 'sneakers', 'shoes', 'fashion'],
+    'Transport':    ['uber', 'bolt', 'taxi', 'gautrain', 'metrobus', 'indrive'],
+    'Shopping':     ['zara', 'h&m', 'mr price', 'mrd', 'edgars', 'superbalist', 'takealot',
+                     'exclusive books', 'postnet', 'greenside', 'kwekery', 'paygate'],
+    'Gaming':       ['steam', 'playstation', 'xbox', 'psn', 'nintendo', 'apple.com',
+                     'claude.ai'],
+    'Clothing':     ['clothing', 'sneakers', 'shoes', 'fashion', 'cotton on', 'fancy face'],
+    'ATM Cash':     ['atm cash'],
+    'Airtime':      ['prepaid airtime', 'airtime'],
 }
 
 
@@ -93,14 +106,22 @@ def detect_column_positions(header_row: list) -> dict:
 def detect_amount_convention(rows: list, column_positions: dict) -> str:
     if column_positions.get('debit') is not None and column_positions.get('credit') is not None:
         return 'split_columns'
-    # single amount column — check for DR/CR suffix first
     amt_idx = column_positions.get('amount')
     if amt_idx is not None:
-        for row in rows[:5]:
+        has_cr = False
+        has_dr = False
+        for row in rows[:20]:
             if amt_idx < len(row):
-                val = str(row[amt_idx]).strip().upper()
-                if val.endswith('DR') or val.endswith('CR'):
-                    return 'dr_cr_suffix'
+                val = str(row[amt_idx] or '').strip().upper()
+                if val.endswith('CR'):
+                    has_cr = True
+                elif val.endswith('DR'):
+                    has_dr = True
+        if has_cr and has_dr:
+            return 'dr_cr_suffix'
+        if has_cr:
+            # Credits marked Cr, debits are plain numbers (FNB style)
+            return 'cr_suffix_only'
         return 'signed_amount'
     return 'split_columns'
 
@@ -122,12 +143,35 @@ def detect_pdf_type(pages: list) -> str:
 
 
 def _extract_table_rows(pages: list):
-    """Return all rows from pages that have a table, or None."""
+    """
+    Return all rows from pages that have a usable table, or None.
+    A table is 'usable' if the amount column is populated in data rows
+    (not crammed into one giant multi-value cell — a pdfplumber artefact).
+    """
     all_rows = []
     for page in pages:
         table = page.extract_table()
-        if table and len(table) > 1 and len(table[0]) >= 3:
-            all_rows.extend(table)
+        if not table or len(table) <= 1 or len(table[0]) < 3:
+            continue
+        # Must look like a transaction table: header needs date + description columns
+        header_lower = [str(c or '').lower() for c in table[0]]
+        has_date = any('date' in h for h in header_lower)
+        has_desc = any(h in header_lower
+                       for h in ('description', 'details', 'particulars', 'narrative'))
+        if not (has_date and has_desc):
+            continue
+        # Validate amount column: if it exists but is mostly None, the table is unusable
+        amt_idx = next((i for i, h in enumerate(header_lower) if 'amount' in h), None)
+        if amt_idx is not None:
+            data_rows = table[1:]
+            non_none = sum(
+                1 for row in data_rows
+                if amt_idx < len(row) and row[amt_idx] is not None
+            )
+            # If fewer than 10% of rows have an amount value, the table is unusable
+            if non_none < max(1, len(data_rows) * 0.1):
+                continue
+        all_rows.extend(table)
     return all_rows if all_rows else None
 
 
@@ -150,6 +194,79 @@ def _extract_positional_rows(pages: list) -> list:
         row_words = sorted(buckets[y_key], key=lambda w: w['x0'])
         rows.append([w['text'] for w in row_words])
     return rows
+
+
+_AMOUNT_LIKE = re.compile(r'^[\d,]+\.\d+(Cr|Dr)?$', re.IGNORECASE)
+_MONTH_ABBR = re.compile(
+    r'^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$', re.IGNORECASE
+)
+
+
+def _extract_positional_table_rows(pages: list):
+    """
+    Heuristic positional row parser for bank statements that lack PDF table borders.
+
+    For each word-row:
+      - Date  : first two words matching <digit> <month-abbr>
+      - Balance: last amount-like word ending with Cr or Dr
+      - Amount : the amount-like word immediately before the balance
+      - Description: everything in between
+
+    Returns column-aligned string rows (like _extract_table_rows), or None.
+    """
+    # Collect all word rows (sorted by X within each Y bucket)
+    all_rows = []
+    for page in pages:
+        words = page.extract_words()
+        if not words:
+            continue
+        buckets = {}
+        for w in words:
+            y_key = round(w['top'] / 3) * 3
+            buckets.setdefault(y_key, []).append(w)
+        for y_key in sorted(buckets):
+            row_words = sorted(buckets[y_key], key=lambda w: w['x0'])
+            all_rows.append([w['text'] for w in row_words])
+
+    if not all_rows:
+        return None
+
+    result = [['date', 'description', 'amount', 'balance']]
+
+    for texts in all_rows:
+        # Row must start with a day number followed by a month abbreviation
+        if len(texts) < 4:
+            continue
+        if not texts[0].isdecimal() or not _MONTH_ABBR.match(texts[1]):
+            continue
+
+        date_str = f'{texts[0]} {texts[1]}'
+        remaining = texts[2:]
+
+        # Find balance: last token ending with Cr or Dr
+        balance_idx = None
+        for j in range(len(remaining) - 1, -1, -1):
+            val = remaining[j]
+            if _AMOUNT_LIKE.match(val) and re.search(r'(Cr|Dr)$', val, re.IGNORECASE):
+                balance_idx = j
+                break
+
+        if balance_idx is None:
+            continue
+
+        # Amount: the token immediately before balance that looks like an amount
+        if balance_idx > 0 and _AMOUNT_LIKE.match(remaining[balance_idx - 1]):
+            amount_idx = balance_idx - 1
+        else:
+            continue  # can't identify a distinct amount column
+
+        balance = remaining[balance_idx]
+        amount = remaining[amount_idx]
+        description = ' '.join(remaining[:amount_idx]).strip()
+
+        result.append([date_str, description, amount, balance])
+
+    return result if len(result) > 1 else None
 
 
 def _parse_num(s: str) -> float:
@@ -181,9 +298,12 @@ def _parse_amount_cell(row: list, cols: dict, convention: str):
     amt_idx = cols.get('amount')
     raw = str(row[amt_idx]).strip().upper() if amt_idx is not None and amt_idx < len(row) else ''
 
-    if convention == 'dr_cr_suffix':
+    if convention in ('dr_cr_suffix', 'cr_suffix_only'):
         amount = _parse_num(raw)
-        is_debit = raw.endswith('DR')
+        if convention == 'dr_cr_suffix':
+            is_debit = raw.endswith('DR')
+        else:  # cr_suffix_only: Cr = credit, no suffix = debit
+            is_debit = not raw.endswith('CR')
         return amount, is_debit
 
     # signed_amount
@@ -196,11 +316,18 @@ def _parse_amount_cell(row: list, cols: dict, convention: str):
 
 def _parse_date(raw: str) -> str:
     """Normalise various date formats to YYYY-MM-DD. Returns raw string on failure."""
+    from datetime import datetime
     raw = (raw or '').strip()
     for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d', '%d %b %Y', '%d %B %Y'):
         try:
-            from datetime import datetime
             return datetime.strptime(raw, fmt).strftime('%Y-%m-%d')
+        except ValueError:
+            continue
+    # FNB style: '06 Feb' with no year — default to current year
+    for fmt in ('%d %b', '%d %B'):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            return dt.replace(year=datetime.now().year).strftime('%Y-%m-%d')
         except ValueError:
             continue
     return raw
@@ -237,6 +364,10 @@ def _rows_to_transactions(rows: list) -> list:
         raw_desc = row[desc_idx] if desc_idx is not None and desc_idx < len(row) else ''
 
         if not raw_date or not raw_desc:
+            continue
+
+        # Skip FNB bank fee rows (description starts with #)
+        if str(raw_desc).strip().startswith('#'):
             continue
 
         amount, is_debit = _parse_amount_cell(row, cols, convention)
@@ -282,8 +413,11 @@ def parse_bank_statement(pdf_file_stream) -> dict:
 
             if pdf_type == 'table':
                 rows = _extract_table_rows(pages)
-            else:
-                rows = _extract_positional_rows(pages)
+
+            # Fall back to positional extraction if table extraction failed or
+            # produced an unusable result (e.g. amounts crammed into one cell)
+            if pdf_type != 'table' or not rows:
+                rows = _extract_positional_table_rows(pages) or _extract_positional_rows(pages)
 
             transactions = _rows_to_transactions(rows or [])
 
