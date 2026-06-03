@@ -103,3 +103,50 @@ def detect_amount_convention(rows: list, column_positions: dict) -> str:
                     return 'dr_cr_suffix'
         return 'signed_amount'
     return 'split_columns'
+
+
+import pdfplumber
+
+
+def detect_pdf_type(pages: list) -> str:
+    """Returns 'table', 'positional', or 'image'."""
+    has_text = False
+    for page in pages:
+        words = page.extract_words()
+        if words:
+            has_text = True
+        table = page.extract_table()
+        if table and len(table) > 1 and len(table[0]) >= 3:
+            return 'table'
+    return 'positional' if has_text else 'image'
+
+
+def _extract_table_rows(pages: list):
+    """Return all rows from pages that have a table, or None."""
+    all_rows = []
+    for page in pages:
+        table = page.extract_table()
+        if table and len(table) > 1 and len(table[0]) >= 3:
+            all_rows.extend(table)
+    return all_rows if all_rows else None
+
+
+def _extract_positional_rows(pages: list) -> list:
+    """Reconstruct rows by grouping words with same Y coordinate (±3px)."""
+    all_words = []
+    for page in pages:
+        all_words.extend(page.extract_words())
+
+    if not all_words:
+        return []
+
+    buckets = {}
+    for w in all_words:
+        y_key = round(w['top'] / 3) * 3
+        buckets.setdefault(y_key, []).append(w)
+
+    rows = []
+    for y_key in sorted(buckets):
+        row_words = sorted(buckets[y_key], key=lambda w: w['x0'])
+        rows.append([w['text'] for w in row_words])
+    return rows

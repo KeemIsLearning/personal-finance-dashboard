@@ -113,3 +113,41 @@ def test_detect_dr_cr_suffix_convention():
         ['2025-05-02', 'Salary', '28000.00 CR', '38000.00'],
     ]
     assert detect_amount_convention(rows, cols) == 'dr_cr_suffix'
+
+
+import io
+from pdf_parser import detect_pdf_type, _extract_table_rows, _extract_positional_rows
+from unittest.mock import MagicMock, patch
+
+def _make_mock_page(table=None, words=None):
+    page = MagicMock()
+    page.extract_table.return_value = table
+    page.extract_words.return_value = words or []
+    return page
+
+def test_extract_table_rows_returns_rows_when_table_present():
+    table = [
+        ['Date', 'Description', 'Debit', 'Credit', 'Balance'],
+        ['2025-05-01', 'Woolworths', '420.00', '', '10000.00'],
+    ]
+    page = _make_mock_page(table=table)
+    rows = _extract_table_rows([page])
+    assert rows == table
+
+def test_extract_table_rows_returns_none_when_no_table():
+    page = _make_mock_page(table=None)
+    rows = _extract_table_rows([page])
+    assert rows is None
+
+def test_extract_positional_rows_groups_by_y():
+    words = [
+        {'text': 'Date', 'top': 10.0, 'x0': 5.0},
+        {'text': 'Description', 'top': 10.0, 'x0': 50.0},
+        {'text': '2025-05-01', 'top': 25.0, 'x0': 5.0},
+        {'text': 'Woolworths', 'top': 25.0, 'x0': 50.0},
+    ]
+    page = _make_mock_page(words=words)
+    rows = _extract_positional_rows([page])
+    assert len(rows) == 2
+    assert rows[0] == ['Date', 'Description']
+    assert rows[1] == ['2025-05-01', 'Woolworths']
