@@ -303,6 +303,35 @@ body {
 }
 .panel-toggle:hover { background: var(--amber-glow); }
 
+.fx-currency-toggle {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.fx-toggle-btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  opacity: 0.5;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.fx-toggle-btn.active {
+  background: var(--amber);
+  color: var(--bg);
+  opacity: 1;
+}
+
+.fx-toggle-btn:hover:not(.active) {
+  opacity: 0.8;
+}
+
 /* ============================================
    ENTRY FORMS
    ============================================ */
