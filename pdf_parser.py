@@ -64,3 +64,42 @@ def classify_transaction(description: str, amount: float, is_debit) -> dict:
             return {'type': 'variable_expense', 'category': category, 'confidence': 'high'}
 
     return {'type': 'variable_expense', 'category': 'Other', 'confidence': 'medium'}
+
+
+_COLUMN_PATTERNS = {
+    'date':        ['date', 'transaction date', 'value date', 'posted'],
+    'description': ['description', 'details', 'narrative', 'reference',
+                    'particulars', 'trans description'],
+    'debit':       ['debit', 'dr', 'withdrawal', 'payments out', 'money out'],
+    'credit':      ['credit', 'cr', 'deposit', 'payments in', 'money in'],
+    'amount':      ['amount', 'value'],
+    'balance':     ['balance', 'running balance', 'available'],
+}
+
+
+def detect_column_positions(header_row: list) -> dict:
+    result = {k: None for k in _COLUMN_PATTERNS}
+    for idx, cell in enumerate(header_row):
+        cell_lower = (cell or '').lower().strip()
+        for role, keywords in _COLUMN_PATTERNS.items():
+            if result[role] is not None:
+                continue
+            if any(kw in cell_lower for kw in keywords):
+                result[role] = idx
+                break
+    return result
+
+
+def detect_amount_convention(rows: list, column_positions: dict) -> str:
+    if column_positions.get('debit') is not None and column_positions.get('credit') is not None:
+        return 'split_columns'
+    # single amount column — check for DR/CR suffix first
+    amt_idx = column_positions.get('amount')
+    if amt_idx is not None:
+        for row in rows[:5]:
+            if amt_idx < len(row):
+                val = str(row[amt_idx]).strip().upper()
+                if val.endswith('DR') or val.endswith('CR'):
+                    return 'dr_cr_suffix'
+        return 'signed_amount'
+    return 'split_columns'

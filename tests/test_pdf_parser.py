@@ -67,3 +67,49 @@ def test_unclassified_when_debit_unknown():
     r = classify_transaction('', 0.0, is_debit=None)
     assert r['type'] == 'unclassified'
     assert r['confidence'] == 'low'
+
+
+from pdf_parser import detect_column_positions, detect_amount_convention
+
+def test_detect_date_and_description_columns():
+    header = ['Date', 'Transaction Description', 'Debit', 'Credit', 'Balance']
+    cols = detect_column_positions(header)
+    assert cols['date'] == 0
+    assert cols['description'] == 1
+    assert cols['debit'] == 2
+    assert cols['credit'] == 3
+    assert cols['balance'] == 4
+    assert cols['amount'] is None
+
+def test_detect_single_amount_column():
+    header = ['Value Date', 'Particulars', 'Amount', 'Running Balance']
+    cols = detect_column_positions(header)
+    assert cols['date'] == 0
+    assert cols['description'] == 1
+    assert cols['amount'] == 2
+    assert cols['debit'] is None
+    assert cols['credit'] is None
+
+def test_detect_split_columns_convention():
+    cols = {'debit': 2, 'credit': 3, 'amount': None}
+    rows = [
+        ['2025-05-01', 'Woolworths', '420.00', '', '10000.00'],
+        ['2025-05-02', 'Salary', '', '28000.00', '38000.00'],
+    ]
+    assert detect_amount_convention(rows, cols) == 'split_columns'
+
+def test_detect_signed_amount_convention():
+    cols = {'debit': None, 'credit': None, 'amount': 2}
+    rows = [
+        ['2025-05-01', 'Woolworths', '-420.00', '10000.00'],
+        ['2025-05-02', 'Salary', '28000.00', '38000.00'],
+    ]
+    assert detect_amount_convention(rows, cols) == 'signed_amount'
+
+def test_detect_dr_cr_suffix_convention():
+    cols = {'debit': None, 'credit': None, 'amount': 2}
+    rows = [
+        ['2025-05-01', 'Woolworths', '420.00 DR', '10000.00'],
+        ['2025-05-02', 'Salary', '28000.00 CR', '38000.00'],
+    ]
+    assert detect_amount_convention(rows, cols) == 'dr_cr_suffix'
