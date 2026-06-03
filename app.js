@@ -126,18 +126,49 @@ async function fetchRate(forceRefresh = false) {
     }
 }
 
-function applyRate(rate, updated) {
-    state.rate = rate;
-    state.rateUpdated = updated;
+function applyRate() {
+    const cur = state.activeCurrency;
+    const rate = state.rates[cur];
+    if (!rate) return;
+
     const formatted = rate.toFixed(4);
+
+    // Header pill
+    const pillLabel = document.getElementById('ratePillLabel');
+    if (pillLabel) pillLabel.textContent = `${cur}/ZAR`;
     document.getElementById('headerRate').textContent = formatted;
+
+    // Stat card
     document.getElementById('statRate').textContent = formatted;
-    document.getElementById('rateSub').textContent = `1 USD = ${rate.toFixed(2)} ZAR`;
-    document.getElementById('fxBigNumber').textContent = rate.toFixed(4);
-    document.getElementById('fxLastUpdate').textContent = `Last updated: ${updated}`;
+    document.getElementById('rateSub').textContent = `1 ${cur} = ${rate.toFixed(2)} ZAR`;
+
+    // FX panel
+    const panelTitle = document.getElementById('fxPanelTitle');
+    if (panelTitle) panelTitle.textContent = `${cur} / ZAR EXCHANGE`;
+    document.getElementById('fxBigNumber').textContent = formatted;
+    const fxUnit = document.getElementById('fxUnit');
+    if (fxUnit) fxUnit.textContent = `ZAR per ${cur}`;
+    document.getElementById('fxLastUpdate').textContent = `Last updated: ${state.rateUpdated}`;
+
+    // Converter tag
+    const convTag = document.getElementById('convCurrencyTag');
+    if (convTag) convTag.textContent = cur;
+
+    // Sparkline label
+    const sparkLabel = document.getElementById('sparklineLabel');
+    if (sparkLabel) sparkLabel.textContent = `${cur}/ZAR RATE THIS MONTH`;
+
     setRateStatus('LIVE');
-    renderSummary();
+    renderSparkline();
     renderConverter();
+}
+
+function setCurrency(currency) {
+    state.activeCurrency = currency;
+    document.querySelectorAll('.fx-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.currency === currency);
+    });
+    applyRate();
 }
 
 function setRateStatus(status) {
@@ -599,6 +630,9 @@ document.querySelectorAll('.btn-cancel').forEach(btn => {
 });
 
 document.getElementById('refreshRate').addEventListener('click', () => fetchRate(true));
+document.querySelectorAll('.fx-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => setCurrency(btn.dataset.currency));
+});
 
 function toggleForm(id) {
   document.getElementById(id).classList.toggle('hidden');
