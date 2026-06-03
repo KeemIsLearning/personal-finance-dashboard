@@ -1081,4 +1081,222 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('budgetEditIncomeBtn').addEventListener('click', openBudgetIncomeEdit);
   document.getElementById('budgetAddBaselineBtn').addEventListener('click', () => openBudgetAddItem('baseline'));
   document.getElementById('budgetAddOptionalBtn').addEventListener('click', () => openBudgetAddItem('optional'));
+
+  // PDF Import
+  initialisePdfImport();
 });
+
+// ── PDF Import ─────────────────────────────────────────────────────────────
+
+const CATEGORY_OPTIONS = {
+  income: ['Salary', 'Transfer In', 'Rental Income', 'Other Income'],
+  fixed_expense: ['Rent', 'Insurance', 'Subscription', 'Medical Aid', 'Loan Repayment', 'Utilities', 'Other'],
+  variable_expense: ['Food & Drink', 'Fuel', 'Transport', 'Shopping', 'Gaming', 'Clothing', 'Other'],
+};
+
+function initialisePdfImport() {
+  const btn = document.getElementById('pdf-import-btn');
+  const input = document.getElementById('pdf-upload-input');
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    if (input.files[0]) handlePdfFileSelected(input.files[0]);
+    input.value = '';
+  });
+  document.getElementById('pdf-modal-close').addEventListener('click', closePdfModal);
+  document.getElementById('pdf-confirm-btn').addEventListener('click', confirmImport);
+  document.getElementById('pdf-select-all').addEventListener('change', e => {
+    document.querySelectorAll('.pdf-row-check').forEach(cb => cb.checked = e.target.checked);
+    updateConfirmButtonState();
+  });
+}
+
+async function handlePdfFileSelected(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    showToast('Please upload a PDF file.', 'error'); return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('This file is too large. Please upload a PDF under 10MB.', 'error'); return;
+  }
+
+  showPdfLoading(true);
+  try {
+    const form = new FormData();
+    form.append('statement', file);
+    const res = await fetch(`${API}/pdf/preview`, { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showToast(data.error || 'Failed to parse PDF.', 'error');
+      return;
+    }
+    renderPreviewModal(data);
+  } catch (err) {
+    showToast('Could not reach the server. Is it running?', 'error');
+  } finally {
+    showPdfLoading(false);
+  }
+}
+
+function renderPreviewModal(parsedData) {
+  const { transactions, summary } = parsedData;
+
+  document.getElementById('pdf-modal-summary').innerHTML =
+    `Found <strong>${summary.total_transactions}</strong> transactions &nbsp;·&nbsp; ` +
+    `<span class="conf-high">&#9679; ${summary.high_confidence} high</span> &nbsp; ` +
+    `<span class="conf-medium">&#9675; ${summary.medium_confidence} medium</span> &nbsp; ` +
+    `<span class="conf-low">&#9675; ${summary.low_confidence} low &#9888;</span> &nbsp;|&nbsp; ` +
+    `Credits: <strong>R ${summary.total_credits.toFixed(2)}</strong> &nbsp; ` +
+    `Debits: <strong>R ${summary.total_debits.toFixed(2)}</strong>`;
+
+  const tbody = document.getElementById('pdf-preview-tbody');
+  tbody.innerHTML = '';
+
+  transactions.forEach((txn, i) => {
+    const isLow = txn.confidence === 'low';
+    const isUnclassified = txn.suggested_type === 'unclassified';
+    const tr = document.createElement('tr');
+    if (isLow || isUnclassified) tr.classList.add('row-low-conf');
+
+    const confIcon = txn.confidence === 'high' ? '<span class="conf-high">&#9679; HIGH</span>'
+      : txn.confidence === 'medium' ? '<span class="conf-medium">&#9675; MED</span>'
+      : '<span class="conf-low">&#9675; LOW &#9888;</span>';
+
+    tr.innerHTML = `
+      <td><input type="checkbox" class="pdf-row-check" data-idx="${i}" checked></td>
+      <td>${txn.date}</td>
+      <td title="${txn.raw_description}">${txn.description}</td>
+      <td>R ${txn.amount.toFixed(2)}</td>
+      <td>
+        <select class="pdf-type-select" data-idx="${i}">
+          ${isUnclassified ? '<option value="">— Select —</option>' : ''}
+          <option value="income"${txn.suggested_type === 'income' ? ' selected' : ''}>Income</option>
+          <option value="variable_expense"${txn.suggested_type === 'variable_expense' ? ' selected' : ''}>Variable Expense</option>
+          <option value="fixed_expense"${txn.suggested_type === 'fixed_expense' ? ' selected' : ''}>Fixed Expense</option>
+          <option value="skip">Skip</option>
+        </select>
+      </td>
+      <td>
+        <select class="pdf-cat-select" data-idx="${i}"></select>
+      </td>
+      <td>${confIcon}</td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const typeSelect = tr.querySelector('.pdf-type-select');
+    const catSelect = tr.querySelector('.pdf-cat-select');
+    updateCategoryOptions(typeSelect, catSelect, txn.suggested_category);
+    typeSelect.addEventListener('change', () => {
+      updateCategoryOptions(typeSelect, catSelect, null);
+      updateConfirmButtonState();
+    });
+    tr.querySelector('.pdf-row-check').addEventListener('change', updateConfirmButtonState);
+  });
+
+  document.getElementById('pdf-modal-overlay').classList.remove('hidden');
+  document.getElementById('pdf-modal-error').classList.add('hidden');
+  updateConfirmButtonState();
+}
+
+function updateCategoryOptions(typeSelect, catSelect, preselect) {
+  const type = typeSelect.value;
+  const options = CATEGORY_OPTIONS[type] || [];
+  catSelect.innerHTML = options.map(o =>
+    `<option value="${o}"${preselect === o ? ' selected' : ''}>${o}</option>`
+  ).join('');
+  if (!preselect && options.length) catSelect.value = options[0];
+}
+
+function updateConfirmButtonState() {
+  const confirmBtn = document.getElementById('pdf-confirm-btn');
+  const rows = document.querySelectorAll('#pdf-preview-tbody tr');
+  let allValid = true;
+  rows.forEach(tr => {
+    const cb = tr.querySelector('.pdf-row-check');
+    if (cb && cb.checked) {
+      const typeSelect = tr.querySelector('.pdf-type-select');
+      if (!typeSelect.value) allValid = false;
+    }
+  });
+  confirmBtn.disabled = !allValid;
+}
+
+function closePdfModal() {
+  document.getElementById('pdf-modal-overlay').classList.add('hidden');
+}
+
+async function confirmImport() {
+  const rows = document.querySelectorAll('#pdf-preview-tbody tr');
+  const transactions = [];
+
+  rows.forEach(tr => {
+    const cb = tr.querySelector('.pdf-row-check');
+    const typeSelect = tr.querySelector('.pdf-type-select');
+    const catSelect = tr.querySelector('.pdf-cat-select');
+
+    const cells = tr.querySelectorAll('td');
+    const date = cells[1].textContent.trim();
+    const description = cells[2].textContent.trim();
+    const amountText = cells[3].textContent.replace('R', '').trim();
+    const amount = parseFloat(amountText);
+
+    transactions.push({
+      date,
+      description,
+      amount,
+      confirmed_type: cb.checked ? typeSelect.value : 'skip',
+      confirmed_category: catSelect.value || 'Other',
+    });
+  });
+
+  const confirmBtn = document.getElementById('pdf-confirm-btn');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Importing…';
+
+  try {
+    const res = await fetch(`${API}/pdf/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactions }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showImportError('Import failed. Please try again.');
+      return;
+    }
+
+    closePdfModal();
+    const msg = data.errors.length
+      ? `${data.inserted} imported, ${data.errors.length} failed.`
+      : `${data.inserted} transactions imported successfully.`;
+    showToast(msg, data.errors.length ? 'warn' : 'success');
+
+    renderAll();
+
+  } catch (err) {
+    showImportError('Could not reach the server.');
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm Import';
+  }
+}
+
+function showImportError(msg) {
+  const el = document.getElementById('pdf-modal-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function showPdfLoading(show) {
+  document.getElementById('pdf-loading-overlay').classList.toggle('hidden', !show);
+}
+
+function showToast(msg, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('toast-visible'), 10);
+  setTimeout(() => { toast.classList.remove('toast-visible'); setTimeout(() => toast.remove(), 400); }, 3500);
+}
