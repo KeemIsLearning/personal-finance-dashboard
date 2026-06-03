@@ -163,15 +163,70 @@ def update_budget():
 #FX proxy routes
 @app.route('/api/fx/latest')
 def fx_latest():
-    r = _requests.get('https://api.frankfurter.app/latest?from=USD&to=ZAR', timeout=5)
-    return (r.content, r.status_code, {'Content-Type': 'application/json'})
+    import json as _json
+    def _fetch_all():
+        r = _requests.get(
+            'https://api.frankfurter.dev/v1/latest?from=ZAR&to=USD,EUR,GBP', timeout=5
+        )
+        if not r.ok:
+            raise Exception(f'HTTP {r.status_code}')
+        d = r.json()
+        return {
+            'date': d['date'],
+            'rates': {k: round(1 / v, 6) for k, v in d['rates'].items()}
+        }
+
+    try:
+        result = _fetch_all()
+        return (_json.dumps(result), 200, {'Content-Type': 'application/json'})
+    except Exception:
+        pass
+
+    # Fallback: open.er-api.com
+    try:
+        r = _requests.get('https://open.er-api.com/v6/latest/ZAR', timeout=5)
+        d = r.json()
+        rates_raw = d.get('rates', {})
+        result = {
+            'date': d.get('time_last_update_utc', '')[:10],
+            'rates': {k: round(1 / rates_raw[k], 6) for k in ('USD', 'EUR', 'GBP') if rates_raw.get(k)}
+        }
+        return (_json.dumps(result), 200, {'Content-Type': 'application/json'})
+    except Exception as exc:
+        import json as _json
+        return (_json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
 
 @app.route('/api/fx/history')
 def fx_history():
+    import json as _json
     from_ = request.args.get('from')
     to = request.args.get('to')
-    r = _requests.get(f'https://api.frankfurter.app/{from_}..{to}?from=USD&to=ZAR', timeout=5)
-    return (r.content, r.status_code, {'Content-Type': 'application/json'})
+
+    try:
+        r = _requests.get(
+            f'https://api.frankfurter.dev/v1/{from_}..{to}?from=ZAR&to=USD,EUR,GBP', timeout=5
+        )
+        if not r.ok:
+            raise Exception(f'HTTP {r.status_code}')
+        d = r.json()
+        inverted = {
+            date: {k: round(1 / v, 6) for k, v in day_rates.items()}
+            for date, day_rates in d.get('rates', {}).items()
+        }
+        return (_json.dumps({'rates': inverted}), 200, {'Content-Type': 'application/json'})
+    except Exception:
+        pass
+
+    # Fallback: return latest rates only (open.er-api.com has no date-range endpoint)
+    try:
+        r = _requests.get('https://open.er-api.com/v6/latest/ZAR', timeout=5)
+        d = r.json()
+        rates_raw = d.get('rates', {})
+        today_str = d.get('time_last_update_utc', '')[:10]
+        day = {k: round(1 / rates_raw[k], 6) for k in ('USD', 'EUR', 'GBP') if rates_raw.get(k)}
+        return (_json.dumps({'rates': {today_str: day}}), 200, {'Content-Type': 'application/json'})
+    except Exception as exc:
+        return (_json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
 
 # ── PDF Import routes ──────────────────────────────────────────────────────
 
