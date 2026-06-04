@@ -157,6 +157,8 @@ function applyRate() {
     // Sparkline label
     const sparkLabel = document.getElementById('sparklineLabel');
     if (sparkLabel) sparkLabel.textContent = `${cur}/ZAR RATE THIS MONTH`;
+    const sparkCanvas = document.getElementById('sparklineChart');
+    if (sparkCanvas) sparkCanvas.setAttribute('aria-label', `${cur}/ZAR daily rate sparkline this month`);
 
     setRateStatus('LIVE');
     renderSparkline();
