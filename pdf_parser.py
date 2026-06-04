@@ -8,14 +8,19 @@ _NOISE_PREFIXES = re.compile(
 _CARD_NUMBER = re.compile(r'\*{4}\d{4}|\d{6}\*\d{4}')
 _LONG_REF = re.compile(r'\b\d{6,}\b')
 _TRAILING_DATE = re.compile(r'\s+\d{1,2}\s+[A-Za-z]{3}\s*$')
-_MULTI_SPACE = re.compile(r' {2,}')
+_MULTI_SPACE = re.compile(r'[ \t]{2,}')
+# FNB prepends original-currency amount to description: "23.00 CLAUDE.AI SUB"
+_LEADING_AMOUNT = re.compile(r'^\d[\d,]*\.\d+\s+')
 
 
 def clean_transaction_description(raw: str) -> str:
     s = raw.strip()
     # Strip leading # (FNB bank fee rows)
     s = s.lstrip('#').strip()
+    # Normalize newlines from multi-line PDF cells to spaces
+    s = s.replace('\n', ' ').replace('\r', ' ')
     s = _NOISE_PREFIXES.sub('', s)
+    s = _LEADING_AMOUNT.sub('', s)
     s = _CARD_NUMBER.sub('', s)
     s = _LONG_REF.sub('', s)
     s = _TRAILING_DATE.sub('', s)
@@ -142,36 +147,72 @@ def detect_pdf_type(pages: list) -> str:
     return 'positional' if has_text else 'image'
 
 
+_DATE_FMTS = ('%d %b %Y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d %b', '%d %B')
+_DR_CR = re.compile(r'-?\d[\d,.]*\s*(DR|CR)$', re.IGNORECASE)
+
+
+def _looks_like_date(s: str) -> bool:
+    from datetime import datetime
+    s = (s or '').strip()
+    for fmt in _DATE_FMTS:
+        try:
+            datetime.strptime(s, fmt)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
 def _extract_table_rows(pages: list):
     """
     Return all rows from pages that have a usable table, or None.
-    A table is 'usable' if the amount column is populated in data rows
-    (not crammed into one giant multi-value cell — a pdfplumber artefact).
+    Handles both headed tables (with Date/Description header row) and
+    headerless tables where the column labels are outside the table border.
     """
     all_rows = []
     for page in pages:
         table = page.extract_table()
-        if not table or len(table) <= 1 or len(table[0]) < 3:
+        if not table or len(table) < 1 or len(table[0]) < 3:
             continue
-        # Must look like a transaction table: header needs date + description columns
+
         header_lower = [str(c or '').lower() for c in table[0]]
         has_date = any('date' in h for h in header_lower)
         has_desc = any(h in header_lower
                        for h in ('description', 'details', 'particulars', 'narrative'))
-        if not (has_date and has_desc):
-            continue
-        # Validate amount column: if it exists but is mostly None, the table is unusable
-        amt_idx = next((i for i, h in enumerate(header_lower) if 'amount' in h), None)
-        if amt_idx is not None:
-            data_rows = table[1:]
-            non_none = sum(
-                1 for row in data_rows
-                if amt_idx < len(row) and row[amt_idx] is not None
-            )
-            # If fewer than 10% of rows have an amount value, the table is unusable
-            if non_none < max(1, len(data_rows) * 0.1):
+
+        if has_date and has_desc:
+            # Headed table — validate amount column isn't crammed into one cell
+            amt_idx = next((i for i, h in enumerate(header_lower) if 'amount' in h), None)
+            if amt_idx is not None:
+                data_rows = table[1:]
+                non_none = sum(
+                    1 for row in data_rows
+                    if amt_idx < len(row) and row[amt_idx] is not None
+                )
+                if non_none < max(1, len(data_rows) * 0.1):
+                    continue
+            all_rows.extend(table)
+
+        else:
+            # Possibly headerless: column labels are outside the table border.
+            # Detect by checking whether col 0 of most rows looks like a date
+            # and col 3 (or last-1) contains DR/CR amounts.
+            n_cols = len(table[0])
+            date_hits = sum(1 for row in table[:5] if _looks_like_date(str(row[0] or '')))
+            if date_hits < 2:
                 continue
-        all_rows.extend(table)
+            amt_col = n_cols - 2  # second-to-last column is typically amount
+            dr_cr_hits = sum(
+                1 for row in table[:5]
+                if amt_col < len(row) and _DR_CR.search(str(row[amt_col] or ''))
+            )
+            if dr_cr_hits < 1:
+                continue
+            # Build synthetic header matching detect_column_positions keywords
+            synth = ['date', 'description'] + ['fee'] * (n_cols - 4) + ['amount', 'balance']
+            all_rows.append(synth)
+            all_rows.extend(table)
+
     return all_rows if all_rows else None
 
 
@@ -364,6 +405,10 @@ def _rows_to_transactions(rows: list) -> list:
         raw_desc = row[desc_idx] if desc_idx is not None and desc_idx < len(row) else ''
 
         if not raw_date or not raw_desc:
+            continue
+
+        # Skip repeated page-header rows (e.g. "Date" / "Description" at top of each page)
+        if not _looks_like_date(str(raw_date)):
             continue
 
         # Skip FNB bank fee rows (description starts with #)
