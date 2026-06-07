@@ -26,3 +26,6 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Superpowers specs (local agent workflow)
+docs/superpowers/
