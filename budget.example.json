@@ -1,7 +1,19 @@
 {
-  "income": 0,
-  "baseline": [],
-  "optional": [],
-  "rules": [],
+  "income": 5000,
+  "baseline": [
+    { "id": 1, "name": "Rent", "amount": 1500, "note": "" },
+    { "id": 2, "name": "Groceries", "amount": 400, "note": "" },
+    { "id": 3, "name": "Utilities", "amount": 150, "note": "" },
+    { "id": 4, "name": "Transport", "amount": 200, "note": "" }
+  ],
+  "optional": [
+    { "id": 1, "name": "Entertainment", "tag": "LEISURE", "tagColor": "accent1", "min": 50, "max": 150 },
+    { "id": 2, "name": "Dining out", "tag": "FOOD", "tagColor": "accent2", "min": 100, "max": 250 },
+    { "id": 3, "name": "Skip this month", "tag": "SAVE", "tagColor": "accent4", "min": 0, "max": 0 }
+  ],
+  "rules": [
+    "Fixed costs are covered first — discretionary spending comes from what's left.",
+    "Select one discretionary item per month, or none to keep the remainder as savings."
+  ],
   "selectedOptional": null
 }

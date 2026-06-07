@@ -39,7 +39,7 @@
       "min": 1399,
       "name": "PlayStation game",
       "tag": "GAMING",
-      "tagColor": "gaming"
+      "tagColor": "accent1"
     },
     {
       "id": 2,
@@ -47,7 +47,7 @@
       "min": 2000,
       "name": "Clothing haul",
       "tag": "WARDROBE",
-      "tagColor": "wardrobe"
+      "tagColor": "accent2"
     },
     {
       "id": 3,
@@ -55,7 +55,7 @@
       "min": 2000,
       "name": "derschutze.com order",
       "tag": "EVERY COUPLE MONTHS",
-      "tagColor": "periodic"
+      "tagColor": "accent3"
     },
     {
       "id": 4,
@@ -63,14 +63,9 @@
       "min": 0,
       "name": "None \u2014 buffer month",
       "tag": "STACK IT",
-      "tagColor": "stack"
+      "tagColor": "accent4"
     }
   ],
-  "rules": [
-    "Clothing month \u2260 gaming month. Both together = R 751 over budget.",
-    "R 667 aside first. Car service fund is untouchable. June and December = R 4,000 ready.",
-    "Only pick one per month. That R 2,698 sits for a special edition, a derschutze drop, or stacks.",
-    "Hair can be up to R 250 if you get it styled \u2014 still within baseline."
-  ],
-  "selectedOptional": 1
+  "rules": [],
+  "selectedOptional": null
 }

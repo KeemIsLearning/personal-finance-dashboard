@@ -12,10 +12,10 @@ const API = 'http://127.0.0.1:5000/api';
 const state = {
     currentYear: new Date().getFullYear(),
     currentMonth: new Date().getMonth(),
-    rates: { USD: null, EUR: null, GBP: null },
+    rates: { USD: null, EUR: null, GBP: null, CAD: null },
     activeCurrency: 'USD',
     rateUpdated: null,
-    sparklineDataAll: { USD: [], EUR: [], GBP: [] },
+    sparklineDataAll: { USD: [], EUR: [], GBP: [], CAD: [] },
     historyChart: null,
     sparklineChart: null,
     budget: null
@@ -95,7 +95,7 @@ async function fetchRate(forceRefresh = false) {
         const res = await fetch('/api/fx/latest');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        const rates = data.rates;          // { USD: 16.27, EUR: 17.86, GBP: 21.04 }
+        const rates = data.rates;          // { USD: 16.27, EUR: 17.86, GBP: 21.04, CAD: 11.50 }
         const updated = data.date || today();
 
         state.rates = rates;
@@ -197,6 +197,7 @@ async function fetchSparklineData() {
                 USD: entries.map(([date, r]) => ({ date, value: r.USD })),
                 EUR: entries.map(([date, r]) => ({ date, value: r.EUR })),
                 GBP: entries.map(([date, r]) => ({ date, value: r.GBP })),
+                CAD: entries.map(([date, r]) => ({ date, value: r.CAD })),
             };
         }
         renderSparkline();
@@ -823,10 +824,35 @@ async function saveEdit() {
 // BUDGET PLANNER
 // =============================================
 
+const BUDGET_TAG_COLORS = ['accent1', 'accent2', 'accent3', 'accent4'];
+const BUDGET_TAG_COLOR_MIGRATION = {
+    gaming: 'accent1', wardrobe: 'accent2', periodic: 'accent3', stack: 'accent4'
+};
+
+function migrateBudget(b) {
+    if (!b) return { migrated: false, budget: b };
+    let migrated = false;
+    for (const item of b.optional || []) {
+        if (BUDGET_TAG_COLOR_MIGRATION[item.tagColor]) {
+            item.tagColor = BUDGET_TAG_COLOR_MIGRATION[item.tagColor];
+            migrated = true;
+        }
+        if (!BUDGET_TAG_COLORS.includes(item.tagColor)) {
+            item.tagColor = 'accent1';
+            migrated = true;
+        }
+    }
+    if (!Array.isArray(b.rules)) { b.rules = []; migrated = true; }
+    return { migrated, budget: b };
+}
+
 async function loadBudget() {
     try {
-        state.budget = await apiFetch('/budget');
+        const raw = await apiFetch('/budget');
+        const { migrated, budget } = migrateBudget(raw);
+        state.budget = budget;
         renderBudget();
+        if (migrated) saveBudget();
     } catch (err) {
         console.error('Budget load failed:', err);
     }
@@ -872,7 +898,7 @@ function renderBudget() {
           </div>
         </li>`).join('') + `
         <li class="budget-item total-row">
-          <span class="budget-item-name">TOTAL BASELINE</span>
+          <span class="budget-item-name">TOTAL FIXED</span>
           <span class="budget-item-amount">R ${baselineTotal.toLocaleString()}</span>
         </li>`;
 
@@ -891,7 +917,7 @@ function renderBudget() {
         const midCost = item.min === item.max ? item.min : Math.round((item.min + item.max) / 2);
         const left = remaining - midCost;
         const leftText = item.min === 0
-            ? `R ${remaining.toLocaleString()} stacked`
+            ? `R ${remaining.toLocaleString()} saved`
             : `\u2248 R ${left.toLocaleString()} left`;
         return `
         <li class="budget-optional-card${isSelected ? ' selected' : ''}" data-oid="${item.id}">
@@ -943,7 +969,7 @@ function renderBudgetTotals() {
 
     document.getElementById('budgetTotals').innerHTML = `
         <div class="budget-total-row">
-          <span>BASELINE</span>
+          <span>FIXED COSTS</span>
           <span class="mono">R ${baselineTotal.toLocaleString()}</span>
         </div>
         ${selected ? `
@@ -956,7 +982,7 @@ function renderBudgetTotals() {
           <span class="mono">${selected ? '\u2248 ' : ''}R ${totalCost.toLocaleString()}</span>
         </div>
         <div class="budget-total-row buffer-row${bufferLeft < 0 ? ' negative' : ''}">
-          <span>BUFFER LEFT</span>
+          <span>REMAINING</span>
           <span class="mono">${selected ? '\u2248 ' : ''}R ${bufferLeft.toLocaleString()}</span>
         </div>`;
 
@@ -968,11 +994,22 @@ function renderBudgetTotals() {
 
 function renderBudgetRules() {
     const rules = state.budget?.rules || [];
-    document.getElementById('budgetRules').innerHTML = rules.map((r, i) => `
-        <li class="rule-item">
+    const el = document.getElementById('budgetRules');
+    el.innerHTML = rules.length === 0
+        ? '<li class="rule-item rule-empty">No notes yet — add budgeting reminders or goals.</li>'
+        : rules.map((r, i) => `
+        <li class="rule-item" data-rid="${i}">
           <span class="rule-num">[${String(i + 1).padStart(2, '0')}]</span>
           <span class="rule-text">${escHtml(r)}</span>
+          <div class="rule-actions">
+            <button class="budget-item-edit" data-rid="${i}" title="Edit">&#9998;</button>
+            <button class="budget-item-delete" data-rid="${i}" title="Delete">&#x2715;</button>
+          </div>
         </li>`).join('');
+    el.querySelectorAll('.budget-item-edit').forEach(btn =>
+        btn.addEventListener('click', e => { e.stopPropagation(); openBudgetRuleEdit(parseInt(btn.dataset.rid)); }));
+    el.querySelectorAll('.budget-item-delete').forEach(btn =>
+        btn.addEventListener('click', e => { e.stopPropagation(); deleteBudgetRule(parseInt(btn.dataset.rid)); }));
 }
 
 async function selectOptional(id) {
@@ -985,6 +1022,37 @@ async function selectOptional(id) {
 async function deleteBudgetItem(list, id) {
     if (!state.budget) return;
     state.budget[list] = state.budget[list].filter(i => i.id !== id);
+    if (list === 'optional' && state.budget.selectedOptional === id) {
+        state.budget.selectedOptional = null;
+    }
+    renderBudget();
+    saveBudget();
+}
+
+function openBudgetRuleEdit(index) {
+    if (!state.budget) return;
+    const rules = state.budget.rules;
+    const text = index >= 0 ? (rules[index] || '') : '';
+    _editTarget = { type: '__budget_rule', index };
+    document.getElementById('editModalTitle').textContent = index >= 0 ? 'EDIT NOTE' : 'ADD NOTE';
+    document.getElementById('editModalBody').innerHTML = `
+        <div class="form-row">
+          <label>Note</label>
+          <textarea id="editRuleText" rows="3" placeholder="e.g. Pay fixed costs before discretionary spending">${escHtml(text)}</textarea>
+        </div>`;
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function openBudgetAddRule() {
+    if (!state.budget) return;
+    if (!Array.isArray(state.budget.rules)) state.budget.rules = [];
+    state.budget.rules.push('');
+    openBudgetRuleEdit(state.budget.rules.length - 1);
+}
+
+async function deleteBudgetRule(index) {
+    if (!state.budget?.rules) return;
+    state.budget.rules.splice(index, 1);
     renderBudget();
     saveBudget();
 }
@@ -1011,7 +1079,7 @@ function openBudgetItemEdit(list, id) {
     if (!item) return;
     _editTarget = { type: `__budget_${list}`, id };
     if (list === 'baseline') {
-        document.getElementById('editModalTitle').textContent = id === -1 ? 'ADD BASELINE ITEM' : 'EDIT BASELINE ITEM';
+        document.getElementById('editModalTitle').textContent = 'EDIT FIXED COST';
         document.getElementById('editModalBody').innerHTML = `
             <div class="form-row">
               <label>Name</label>
@@ -1026,9 +1094,9 @@ function openBudgetItemEdit(list, id) {
               <input type="text" id="editBNote" value="${escHtml(item.note || '')}" placeholder="optional" />
             </div>`;
     } else {
-        const tagColorOpts = ['gaming','wardrobe','periodic','stack'].map(v =>
+        const tagColorOpts = BUDGET_TAG_COLORS.map(v =>
             `<option value="${v}"${v === item.tagColor ? ' selected' : ''}>${v}</option>`).join('');
-        document.getElementById('editModalTitle').textContent = id === -1 ? 'ADD OPTIONAL ITEM' : 'EDIT OPTIONAL ITEM';
+        document.getElementById('editModalTitle').textContent = 'EDIT DISCRETIONARY ITEM';
         document.getElementById('editModalBody').innerHTML = `
             <div class="form-row">
               <label>Name</label>
@@ -1036,7 +1104,7 @@ function openBudgetItemEdit(list, id) {
             </div>
             <div class="form-row">
               <label>Tag label</label>
-              <input type="text" id="editOTag" value="${escHtml(item.tag)}" placeholder="e.g. GAMING" />
+              <input type="text" id="editOTag" value="${escHtml(item.tag)}" placeholder="e.g. LEISURE" />
             </div>
             <div class="form-row">
               <label>Tag colour</label>
@@ -1061,7 +1129,7 @@ function openBudgetAddItem(list) {
     if (list === 'baseline') {
         b.baseline.push({ id: newId, name: '', amount: 0, note: '' });
     } else {
-        b.optional.push({ id: newId, name: '', tag: '', tagColor: 'gaming', min: 0, max: 0 });
+        b.optional.push({ id: newId, name: '', tag: '', tagColor: 'accent1', min: 0, max: 0 });
     }
     openBudgetItemEdit(list, newId);
 }
@@ -1094,6 +1162,16 @@ async function saveBudgetEdit() {
         const max      = parseFloat(document.getElementById('editOMax').value) || 0;
         if (!name) { alert('Enter a name.'); return; }
         item.name = name; item.tag = tag; item.tagColor = tagColor; item.min = min; item.max = max;
+
+    } else if (type === '__budget_rule') {
+        const idx = _editTarget.index;
+        const text = document.getElementById('editRuleText').value.trim();
+        if (!text) {
+            if (idx >= 0) state.budget.rules.splice(idx, 1);
+        } else {
+            state.budget.rules[idx] = text;
+        }
+
     } else {
         // fallback to regular entry edit
         saveEdit();
@@ -1130,6 +1208,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('budgetEditIncomeBtn').addEventListener('click', openBudgetIncomeEdit);
   document.getElementById('budgetAddBaselineBtn').addEventListener('click', () => openBudgetAddItem('baseline'));
   document.getElementById('budgetAddOptionalBtn').addEventListener('click', () => openBudgetAddItem('optional'));
+  document.getElementById('budgetAddRuleBtn').addEventListener('click', openBudgetAddRule);
 
   // PDF Import
   initialisePdfImport();

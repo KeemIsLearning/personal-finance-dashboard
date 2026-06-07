@@ -158,6 +158,7 @@
               <button class="fx-toggle-btn active" data-currency="USD">USD</button>
               <button class="fx-toggle-btn" data-currency="EUR">EUR</button>
               <button class="fx-toggle-btn" data-currency="GBP">GBP</button>
+              <button class="fx-toggle-btn" data-currency="CAD">CAD</button>
             </div>
             <button class="panel-toggle" id="refreshRate">↻ REFRESH</button>
           </div>
@@ -220,7 +221,7 @@
 
       <div class="panel-header budget-panel-header">
         <div class="budget-header-left">
-          <span class="panel-title">KMK_BUDGET</span>
+          <span class="panel-title">BUDGET PLANNER</span>
           <span class="budget-header-sub">MONTHLY · ZAR</span>
         </div>
         <button class="panel-toggle" id="budgetEditIncomeBtn">EDIT INCOME</button>
@@ -233,7 +234,7 @@
           <span class="stat-value" id="budgetIncome">R 0</span>
         </div>
         <div class="stat-card budget-baseline-card">
-          <span class="stat-label">BASELINE OUT</span>
+          <span class="stat-label">FIXED COSTS</span>
           <span class="stat-value" id="budgetBaselineOut">R 0</span>
         </div>
         <div class="stat-card budget-remaining-card">
@@ -248,16 +249,16 @@
         <!-- Left column: baseline + optional -->
         <div class="budget-col-left">
 
-          <div class="budget-section-label">BASELINE — EVERY MONTH</div>
+          <div class="budget-section-label">FIXED COSTS <span class="budget-section-sub">(EVERY MONTH)</span></div>
           <ul class="budget-list" id="budgetBaselineList"></ul>
           <div class="budget-add-row">
             <button class="panel-toggle" id="budgetAddBaselineBtn">+ ADD ITEM</button>
           </div>
 
-          <div class="budget-section-label">OPTIONAL — PICK ONE <span class="budget-section-sub">(TAP TO SELECT)</span></div>
+          <div class="budget-section-label">DISCRETIONARY <span class="budget-section-sub">(SELECT ONE)</span></div>
           <ul class="budget-list" id="budgetOptionalList"></ul>
           <div class="budget-add-row">
-            <button class="panel-toggle" id="budgetAddOptionalBtn">+ ADD OPTION</button>
+            <button class="panel-toggle" id="budgetAddOptionalBtn">+ ADD ITEM</button>
           </div>
 
         </div>
@@ -282,8 +283,11 @@
             </div>
           </div>
 
-          <div class="budget-section-label" style="padding-left:0;border-top:none">RULES</div>
+          <div class="budget-section-label" style="padding-left:0;border-top:none">NOTES</div>
           <ul class="budget-rules" id="budgetRules"></ul>
+          <div class="budget-add-row">
+            <button class="panel-toggle" id="budgetAddRuleBtn">+ ADD NOTE</button>
+          </div>
 
         </div>
       </div>
