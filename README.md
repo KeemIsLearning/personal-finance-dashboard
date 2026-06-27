@@ -155,6 +155,21 @@ Once the server is running, these are the routes `app.js` communicates with:
 
 ---
 
+## Changelog
+
+### June 2026
+
+- **JPY & CNY currency support** — Japanese Yen and Chinese Yuan added across the income form, FX panel toggle, sparkline chart, and server-side FX proxy
+- **Multi-currency FX toggle** — Live rate panel now shows USD, EUR, GBP, CAD, JPY, and CNY rates simultaneously with per-currency sparkline history
+- **Flexible income currency entry** — Income entries support any tracked foreign currency with a live conversion preview locked to the rate at the moment of entry
+- **CAD currency support** — Canadian Dollar added to the FX system as an earlier addition to the multi-currency rollout
+- **Budget planner** — Variable spending budget tool with baseline allocations, optional spend categories, tagging, and note editing
+- **PDF bank statement import** — Upload an FNB PDF statement; the parser extracts transactions, previews them, and lets you confirm before importing into the database
+- **FX rate history sparkline** — Visual chart of daily USD/ZAR (and other currencies) movement throughout the current month
+- **Multi-currency FX architecture** — Backend FX proxy refactored to fetch all currencies in a single API call using a configurable currency list
+
+---
+
 ## Roadmap
 
 - [ ] Flask backend + SQLite schema (in progress)
