@@ -1,6 +1,6 @@
 # Personal Finance Dashboard
 
-A dark-industrial personal finance tracker built with HTML, CSS, JavaScript, Python (Flask), and SQLite. Runs entirely on your local machine which means no cloud storage, no subscriptions and no data leaving your device
+A dark-industrial personal finance tracker built with HTML, CSS, JavaScript, Python (Flask), and SQLite. Runs entirely on your local machine — no cloud storage, no subscriptions, no data leaving your device.
 
 Built as a portfolio project for [P4THF1ND3R](https://p4thf1nd3r.netlify.app)
 
@@ -8,18 +8,18 @@ Built as a portfolio project for [P4THF1ND3R](https://p4thf1nd3r.netlify.app)
 
 ## Features
 
-- **Income tracking** - Log salary (ZAR), and any other income sources
-- **Fixed expense tracking** - Recurring committed costs: school fees (per person), subscriptions, car service, pass-through purchases from family
-- **Variable expense tracking** - Personal day-to-day spending: fuel, food, clothing, gaming, and anything else
-- **Automatic date stamping** - Every entry records the exact date it was logged; the dashboard reads today's date from the system clock on every open
-- **Live USD/ZAR exchange rate** - Fetched automatically from the [Frankfurter API](https://frankfurter.dev) (no API key needed), cached hourly
-- **Rate history log** - Every fetched rate is saved to the database, building a personal record of USD/ZAR movement over time
-- **Built-in USD ↔ ZAR converter** - Inline currency converter using the live rate
-- **Congo rent conversion preview** - Shows the ZAR equivalent before you confirm the entry, locked to the rate at that exact moment
-- **Daily rate sparkline** - Visual of USD/ZAR movement throughout the current month
-- **Monthly history chart** - Bar + line chart comparing income, expenses, and net balance over the past 6 months
-- **Month navigation** - Browse any past or future month's data
-- **Persistent storage** - All data stored in a local SQLite database (`finance.db`) on your machine
+- **Income tracking** — Log salary, freelance income, rental income, and any other sources
+- **Fixed expense tracking** — Recurring committed costs: subscriptions, services, pass-through purchases
+- **Variable expense tracking** — Day-to-day personal spending: fuel, food, clothing, entertainment, and anything else
+- **Automatic date stamping** — Every entry records the exact date it was logged; the dashboard reads today's date from the system clock on every open
+- **Live USD/ZAR exchange rate** — Fetched automatically from the [Frankfurter API](https://frankfurter.dev) (no API key needed), cached hourly
+- **Rate history log** — Every fetched rate is saved to the database, building a personal record of USD/ZAR movement over time
+- **Built-in USD ↔ ZAR converter** — Inline currency converter using the live rate
+- **Currency conversion preview** — Shows the ZAR equivalent before you confirm an entry, locked to the rate at that exact moment
+- **Daily rate sparkline** — Visual of USD/ZAR movement throughout the current month
+- **Monthly history chart** — Bar + line chart comparing income, expenses, and net balance over the past 6 months
+- **Month navigation** — Browse any past or future month's data
+- **Persistent storage** — All data stored in a local SQLite database (`finance.db`) on your machine
 
 ---
 
@@ -43,12 +43,12 @@ Four tables:
 
 | Table | Purpose |
 |---|---|
-| `income` | Every payment received — salary, Congo rent (USD→ZAR), other |
-| `fixed_expenses` | Recurring committed costs with due dates and per-person tracking |
+| `income` | Every payment received — salary, foreign currency income, or other |
+| `fixed_expenses` | Recurring committed costs with due dates and optional per-person tracking |
 | `variable_expenses` | Day-to-day personal spending by category |
 | `exchange_rates` | Historical log of every USD/ZAR rate fetched |
 
-`income` entries that use USD→ZAR conversion store both the original USD amount and the exact rate used, so the conversion is permanently auditable.
+Income entries that use USD→ZAR conversion store both the original USD amount and the exact rate used, so the conversion is permanently auditable.
 
 ---
 
