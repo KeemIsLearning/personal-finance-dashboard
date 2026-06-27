@@ -1,71 +1,7 @@
 {
-  "baseline": [
-    {
-      "amount": 1000,
-      "id": 1,
-      "name": "Food",
-      "note": ""
-    },
-    {
-      "amount": 1000,
-      "id": 2,
-      "name": "Fuel",
-      "note": ""
-    },
-    {
-      "amount": 385,
-      "id": 3,
-      "name": "Claude Pro",
-      "note": ""
-    },
-    {
-      "amount": 250,
-      "id": 4,
-      "name": "Hair retwist",
-      "note": ""
-    },
-    {
-      "amount": 667,
-      "id": 5,
-      "name": "Car service savings",
-      "note": "untouchable"
-    }
-  ],
-  "income": 6000,
-  "optional": [
-    {
-      "id": 1,
-      "max": 1499,
-      "min": 1399,
-      "name": "PlayStation game",
-      "tag": "GAMING",
-      "tagColor": "accent1"
-    },
-    {
-      "id": 2,
-      "max": 2000,
-      "min": 2000,
-      "name": "Clothing haul",
-      "tag": "WARDROBE",
-      "tagColor": "accent2"
-    },
-    {
-      "id": 3,
-      "max": 2700,
-      "min": 2000,
-      "name": "derschutze.com order",
-      "tag": "EVERY COUPLE MONTHS",
-      "tagColor": "accent3"
-    },
-    {
-      "id": 4,
-      "max": 0,
-      "min": 0,
-      "name": "None \u2014 buffer month",
-      "tag": "STACK IT",
-      "tagColor": "accent4"
-    }
-  ],
+  "baseline": [],
+  "income": 10000,
+  "optional": [],
   "rules": [],
   "selectedOptional": null
 }

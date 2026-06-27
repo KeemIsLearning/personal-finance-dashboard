@@ -12,10 +12,10 @@ const API = 'http://127.0.0.1:5000/api';
 const state = {
     currentYear: new Date().getFullYear(),
     currentMonth: new Date().getMonth(),
-    rates: { USD: null, EUR: null, GBP: null, CAD: null },
+    rates: { USD: null, EUR: null, GBP: null, CAD: null, JPY: null, CNY: null },
     activeCurrency: 'USD',
     rateUpdated: null,
-    sparklineDataAll: { USD: [], EUR: [], GBP: [], CAD: [] },
+    sparklineDataAll: { USD: [], EUR: [], GBP: [], CAD: [], JPY: [], CNY: [] },
     historyChart: null,
     sparklineChart: null,
     budget: null
@@ -200,6 +200,8 @@ async function fetchSparklineData() {
                 EUR: entries.map(([date, r]) => ({ date, value: r.EUR })),
                 GBP: entries.map(([date, r]) => ({ date, value: r.GBP })),
                 CAD: entries.map(([date, r]) => ({ date, value: r.CAD })),
+                JPY: entries.map(([date, r]) => ({ date, value: r.JPY })),
+                CNY: entries.map(([date, r]) => ({ date, value: r.CNY })),
             };
         }
         renderSparkline();
@@ -351,10 +353,10 @@ async function deleteEntry(type, id) {
 }
 
 //Form submission
-const INCOME_CURRENCIES = ['USD', 'GBP', 'EUR', 'ZAR'];
+const INCOME_CURRENCIES = ['USD', 'GBP', 'EUR', 'ZAR', 'JPY', 'CNY'];
 
 function currencySymbol(currency) {
-    return { USD: '$', GBP: '£', EUR: '€', ZAR: 'R' }[currency] || currency;
+    return { USD: '$', GBP: '£', EUR: '€', ZAR: 'R', JPY: '¥', CNY: 'CN¥' }[currency] || currency;
 }
 
 function formatCurrencyAmount(amount, currency) {

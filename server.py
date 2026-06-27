@@ -161,11 +161,14 @@ def update_budget():
     return jsonify({'saved': True})
 
 #FX proxy routes
+FX_CURRENCIES = ('USD', 'EUR', 'GBP', 'CAD', 'JPY', 'CNY')
+FX_CURRENCIES_QUERY = ','.join(FX_CURRENCIES)
+
 @app.route('/api/fx/latest')
 def fx_latest():
     def _fetch_all():
         r = _requests.get(
-            'https://api.frankfurter.dev/v1/latest?from=ZAR&to=USD,EUR,GBP,CAD', timeout=5
+            f'https://api.frankfurter.dev/v1/latest?from=ZAR&to={FX_CURRENCIES_QUERY}', timeout=5
         )
         if not r.ok:
             raise Exception(f'HTTP {r.status_code}')
@@ -190,7 +193,7 @@ def fx_latest():
         date_str = datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d') if ts else ''
         result = {
             'date': date_str,
-            'rates': {k: round(1 / rates_raw[k], 6) for k in ('USD', 'EUR', 'GBP', 'CAD') if rates_raw.get(k)}
+            'rates': {k: round(1 / rates_raw[k], 6) for k in FX_CURRENCIES if rates_raw.get(k)}
         }
         return (json.dumps(result), 200, {'Content-Type': 'application/json'})
     except Exception as exc:
@@ -212,7 +215,7 @@ def fx_history():
 
     try:
         r = _requests.get(
-            f'https://api.frankfurter.dev/v1/{from_}..{to}?from=ZAR&to=USD,EUR,GBP,CAD', timeout=5
+            f'https://api.frankfurter.dev/v1/{from_}..{to}?from=ZAR&to={FX_CURRENCIES_QUERY}', timeout=5
         )
         if not r.ok:
             raise Exception(f'HTTP {r.status_code}')
@@ -232,7 +235,7 @@ def fx_history():
         rates_raw = d.get('rates', {})
         ts = d.get('time_last_update_unix', 0)
         today_str = datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d') if ts else ''
-        day = {k: round(1 / rates_raw[k], 6) for k in ('USD', 'EUR', 'GBP', 'CAD') if rates_raw.get(k)}
+        day = {k: round(1 / rates_raw[k], 6) for k in FX_CURRENCIES if rates_raw.get(k)}
         return (json.dumps({'rates': {today_str: day}}), 200, {'Content-Type': 'application/json'})
     except Exception as exc:
         return (json.dumps({'error': str(exc)}), 503, {'Content-Type': 'application/json'})
