@@ -163,6 +163,8 @@ function applyRate() {
     setRateStatus('LIVE');
     renderSparkline();
     renderConverter();
+    updateIncomeConversionPreview('income');
+    if (_editTarget?.type === 'income') updateIncomeConversionPreview('edit');
 }
 
 function setCurrency(currency) {
@@ -246,9 +248,9 @@ function renderSummary(income, fixed, variable) {
   const hasSalary = sources.includes('salary');
   const hasRent = sources.includes('rent_usd');
   let incomeSub = '';
-  if (hasSalary && hasRent) incomeSub = 'salary + congo rent';
+  if (hasSalary && hasRent) incomeSub = 'salary + international income';
   else if (hasSalary) incomeSub = 'salary';
-  else if (hasRent) incomeSub = 'congo rent';
+  else if (hasRent) incomeSub = 'international income';
   else incomeSub = `${income.length} entries`;
   document.getElementById('incomeSub').textContent = incomeSub;
 
@@ -269,8 +271,10 @@ function renderIncomeList(income) {
       const li = document.createElement('li');
       li.className = 'entry-item';
       let noteStr = entry.notes || sourceName(entry.source);
-      if (entry.currency === 'USD' && entry.rate_used) {
-          noteStr += ` ($ ${entry.amount_original.toFixed(2)} @ ${entry.rate_used.toFixed(4)})`;
+      if (entry.currency && entry.currency !== 'ZAR') {
+          noteStr += ` (${formatCurrencyAmount(entry.amount_original, entry.currency)}`;
+          if (entry.rate_used) noteStr += ` @ ${entry.rate_used.toFixed(4)}`;
+          noteStr += ')';
       }
       li.innerHTML = `
           <div class="entry-left">
@@ -347,41 +351,101 @@ async function deleteEntry(type, id) {
 }
 
 //Form submission
-document.getElementById('incomeSource').addEventListener('change', function () {
-  const isUSD = this.value === 'rent_usd';
-  document.getElementById('conversionPreview').style.display = isUSD ? 'grid' : 'none';
-  updateConversionPreview();
-});
+const INCOME_CURRENCIES = ['USD', 'GBP', 'EUR', 'ZAR'];
 
-document.getElementById('incomeAmount').addEventListener('input', updateConversionPreview);
-
-function updateConversionPreview() {
-  const source = document.getElementById('incomeSource').value;
-  const amount = parseFloat(document.getElementById('incomeAmount').value);
-  const el = document.getElementById('conversionValue');
-  if (source === 'rent_usd' && !isNaN(amount) && state.rates.USD) {
-      el.textContent = `R ${(amount * state.rates.USD).toFixed(2)}`;
-  } else {
-      el.textContent = 'calculating…';
-  }
+function currencySymbol(currency) {
+    return { USD: '$', GBP: '£', EUR: '€', ZAR: 'R' }[currency] || currency;
 }
+
+function formatCurrencyAmount(amount, currency) {
+    const sym = currencySymbol(currency);
+    const spaced = currency === 'ZAR' ? `${sym} ` : sym;
+    return `${spaced}${amount.toFixed(2)}`;
+}
+
+function incomeAmountInZar(amount, currency) {
+    if (currency === 'ZAR') return amount;
+    const rate = state.rates[currency];
+    if (!rate) return null;
+    return amount * rate;
+}
+
+function convertIncomeAmount(amount, fromCurrency, toCurrency) {
+    if (fromCurrency === toCurrency) return amount;
+    const zar = incomeAmountInZar(amount, fromCurrency);
+    if (zar === null) return null;
+    if (toCurrency === 'ZAR') return zar;
+    const rate = state.rates[toCurrency];
+    if (!rate) return null;
+    return zar / rate;
+}
+
+function incomeCurrencyOptions(selected) {
+    return INCOME_CURRENCIES.map(c =>
+        `<option value="${c}"${c === selected ? ' selected' : ''}>${c}</option>`
+    ).join('');
+}
+
+function updateIncomeConversionPreview(prefix = 'income') {
+    const amountEl = document.getElementById(`${prefix}Amount`);
+    const currencyEl = document.getElementById(`${prefix}Currency`);
+    const panelEl = document.getElementById(`${prefix === 'income' ? 'incomeConversions' : 'editIncomeConversions'}`);
+    const gridEl = document.getElementById(`${prefix === 'income' ? 'incomeConversionGrid' : 'editIncomeConversionGrid'}`);
+    if (!amountEl || !currencyEl || !panelEl || !gridEl) return;
+
+    const amount = parseFloat(amountEl.value);
+    const fromCurrency = currencyEl.value;
+
+    if (isNaN(amount) || amount <= 0) {
+        panelEl.classList.add('hidden');
+        return;
+    }
+
+    panelEl.classList.remove('hidden');
+    const others = INCOME_CURRENCIES.filter(c => c !== fromCurrency);
+
+    const missingRates = fromCurrency !== 'ZAR' && !state.rates[fromCurrency]
+        || others.some(c => c !== 'ZAR' && !state.rates[c]);
+
+    if (missingRates) {
+        gridEl.innerHTML = '<span class="income-conversion-hint">Exchange rates loading — refresh FX panel if this persists.</span>';
+        return;
+    }
+
+    gridEl.innerHTML = others.map(toCurrency => {
+        const converted = convertIncomeAmount(amount, fromCurrency, toCurrency);
+        return `<div class="income-conversion-row">
+            <span class="conv-currency">${toCurrency}</span>
+            <span class="conv-value">${formatCurrencyAmount(converted, toCurrency)}</span>
+        </div>`;
+    }).join('');
+}
+
+function wireIncomeConversionListeners(prefix = 'income') {
+    const amountEl = document.getElementById(`${prefix}Amount`);
+    const currencyEl = document.getElementById(`${prefix}Currency`);
+    if (!amountEl || !currencyEl) return;
+    amountEl.oninput = () => updateIncomeConversionPreview(prefix);
+    currencyEl.onchange = () => updateIncomeConversionPreview(prefix);
+}
+
+wireIncomeConversionListeners('income');
 
 document.getElementById('submitIncome').addEventListener('click', async () => {
   const source = document.getElementById('incomeSource').value;
+  const currency = document.getElementById('incomeCurrency').value;
   const rawAmount = parseFloat(document.getElementById('incomeAmount').value);
   const note = document.getElementById('incomeNote').value.trim();
 
   if (isNaN(rawAmount) || rawAmount <= 0) { alert('Please enter a valid amount.'); return; }
 
   let amount_zar = rawAmount;
-  let currency = 'ZAR';
   let rate_used = null;
 
-  if (source === 'rent_usd') {
-      if (!state.rates.USD) { alert('Exchange rate not loaded yet. Please wait or refresh.'); return; }
-      amount_zar = rawAmount * state.rates.USD;
-      currency = 'USD';
-      rate_used = state.rates.USD;
+  if (currency !== 'ZAR') {
+      if (!state.rates[currency]) { alert('Exchange rate not loaded yet. Please wait or refresh.'); return; }
+      rate_used = state.rates[currency];
+      amount_zar = rawAmount * rate_used;
   }
 
   try {
@@ -397,7 +461,8 @@ document.getElementById('submitIncome').addEventListener('click', async () => {
 
       document.getElementById('incomeAmount').value = '';
       document.getElementById('incomeNote').value = '';
-      document.getElementById('conversionPreview').style.display = 'none';
+      document.getElementById('incomeCurrency').value = 'ZAR';
+      document.getElementById('incomeConversions').classList.add('hidden');
       toggleForm('incomeForm');
       renderAll();
   } catch (err) {
@@ -647,7 +712,7 @@ function toggleForm(id) {
 }
 
 function sourceName(src) {
-  const map = { salary: 'Salary', rent_usd: 'Congo Rent', other: 'Other' };
+  const map = { salary: 'Salary', rent_usd: 'International Income', other: 'Other' };
   return map[src] || src;
 }
 
@@ -688,18 +753,27 @@ function categoryOptions(selected) {
 
 function buildEditForm(type, entry) {
     if (type === 'income') {
+        const currency = entry.currency || 'ZAR';
         return `
           <div class="form-row">
             <label>Source</label>
             <select id="editSource">
-              <option value="salary"${entry.source==='salary'?' selected':''}>Salary (ZAR)</option>
-              <option value="rent_usd"${entry.source==='rent_usd'?' selected':''}>Congo Rent (USD)</option>
-              <option value="other"${entry.source==='other'?' selected':''}>Other (ZAR)</option>
+              <option value="salary"${entry.source==='salary'?' selected':''}>Salary</option>
+              <option value="rent_usd"${entry.source==='rent_usd'?' selected':''}>International Income</option>
+              <option value="other"${entry.source==='other'?' selected':''}>Other</option>
             </select>
+          </div>
+          <div class="form-row">
+            <label>Currency</label>
+            <select id="editCurrency">${incomeCurrencyOptions(currency)}</select>
           </div>
           <div class="form-row">
             <label>Amount</label>
             <input type="number" id="editAmount" value="${entry.amount_original}" min="0" step="0.01" />
+          </div>
+          <div class="form-row income-conversions hidden" id="editIncomeConversions">
+            <label>Equivalent</label>
+            <div class="income-conversion-grid" id="editIncomeConversionGrid"></div>
           </div>
           <div class="form-row">
             <label>Date</label>
@@ -766,6 +840,10 @@ function openEditModal(type, entry) {
     document.getElementById('editModalTitle').textContent = titles[type];
     document.getElementById('editModalBody').innerHTML = buildEditForm(type, entry);
     document.getElementById('editModal').classList.remove('hidden');
+    if (type === 'income') {
+        wireIncomeConversionListeners('edit');
+        updateIncomeConversionPreview('edit');
+    }
 }
 
 function closeEditModal() {
@@ -779,16 +857,17 @@ async function saveEdit() {
 
     if (type === 'income') {
         const source = document.getElementById('editSource').value;
+        const currency = document.getElementById('editCurrency').value;
         const amount_original = parseFloat(document.getElementById('editAmount').value);
         const date_received = document.getElementById('editDate').value;
         const notes = document.getElementById('editNotes').value.trim();
         if (isNaN(amount_original) || amount_original <= 0) { alert('Enter a valid amount.'); return; }
-        let currency = 'ZAR', amount_zar = amount_original, rate_used = null;
-        if (source === 'rent_usd') {
-            if (!state.rates.USD) { alert('Exchange rate not loaded yet.'); return; }
-            currency = 'USD';
-            amount_zar = parseFloat((amount_original * state.rates.USD).toFixed(2));
-            rate_used = state.rates.USD;
+        let amount_zar = amount_original;
+        let rate_used = null;
+        if (currency !== 'ZAR') {
+            if (!state.rates[currency]) { alert('Exchange rate not loaded yet.'); return; }
+            rate_used = state.rates[currency];
+            amount_zar = parseFloat((amount_original * rate_used).toFixed(2));
         }
         body = { source, amount_original, currency, amount_zar, rate_used, date_received, notes };
     } else if (type === 'fixed') {
